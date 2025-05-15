@@ -8,30 +8,6 @@ force=false
 
 logsFile="${dataDir}/logs"
 
-if [ ! -d "${dataDir}" ]; then
-	if ! mkdir -p "${dataDir}"; then
-		echo nepodarilo sa vytvorit adresar "${dataDir}" >&2
-		return 1
-	fi
-fi
-
-if [ ! -d "${backupDir}" ]; then
-	if ! mkdir -p "${backupDir}"; then
-		echo nepodarilo sa vytvorit adresar "${backupDir}" >&2
-		return 1
-	fi
-fi
-
-if [ ! -f "${logsFile}" ]; then
-	if ! touch "${logsFile}"; then
-		echo nepodarilo sa vytvorit subor "${logsFile}" >&2
-		return 1
-	fi
-fi
-
-logMessage="$(date "+%Y-%m-%d %H:%M.%S") $$ ${LOGNAME:-x} $0 $@"
-echo "${logMessage}" >> $logsFile
-
 pomoc() {
 	cat << EOF
 pomoooooc
@@ -62,6 +38,30 @@ parseParams() {
 		esac
 		shift
 	done
+
+	if [ ! -d "${dataDir}" ]; then
+		if ! mkdir -p "${dataDir}"; then
+			echo nepodarilo sa vytvorit adresar "${dataDir}" >&2
+			return 1
+		fi
+	fi
+
+	if [ ! -d "${backupDir}" ]; then
+		if ! mkdir -p "${backupDir}"; then
+			echo nepodarilo sa vytvorit adresar "${backupDir}" >&2
+			return 1
+		fi
+	fi
+
+	if [ ! -f "${logsFile}" ]; then
+		if ! touch "${logsFile}"; then
+			echo nepodarilo sa vytvorit subor "${logsFile}" >&2
+			return 1
+		fi
+	fi
+
+	logMessage="$(date "+%Y-%m-%d %H:%M.%S") $$ ${LOGNAME:-x} $0 $@"
+	echo "${logMessage}" >> $logsFile
 
 	args=("$@")
 	command="${args[0]-}"
