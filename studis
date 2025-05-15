@@ -298,7 +298,70 @@ parseParams() {
 
 			exit 0
 			;;
-            
+
+		"zálohy" | "zalohy")
+
+            if [[ "$#" -gt 1 ]]; then
+				die "nadbytecne parametry" 1
+			fi
+
+			if [[ ! -d "$backupDir" ]]; then
+				die "zalohy nene" 1
+			fi
+			
+			ls "$backupDir" | sort -r
+
+			exit 0
+			;;
+			
+		"zálohy-smaž" | "zalohy-smaz")
+
+            if [[ "$#" -gt 1 ]]; then
+				die "nadbytecne parametry" 1
+			fi
+
+			if [[ ! -d "$backupDir" ]]; then
+				die "zalohy nene" 1
+			fi
+
+			local backups=($(ls "$backupDir" | sort -r))
+			
+			if [[ "${#backups[@]}" -gt 2 ]]; then
+				for backup in "${backups[@]:2}"; do
+					rm "${backupDir}/${backup}"
+				done
+			fi
+
+			exit 0
+			;;
+
+		"obnova")
+
+            if [[ "$#" -gt 2 ]]; then
+				die "nadbytecne parametry" 1
+			fi
+
+			if [[ $# -lt 2 ]]; then
+                die "chyby timestamp" 1
+            fi
+
+			if [[ ! -d "$backupDir" ]]; then
+				die "zalohy nene" 1
+			fi
+
+			local backupFile="${args[1]}"
+
+			if [[ ! -f "${backupDir}/${backupFile}" ]]; then
+				die "zadana zaloha neexistuje" 1
+			fi
+
+			if ! tar -xzf "${backupDir}/${backupFile}" -C "$dataDir"; then
+				die "chyba pri obnove" 1
+			fi
+
+			exit 0
+			;;
+					
         *)
             die "neznam prikaz: ${command:-<empty>}"
             ;;
