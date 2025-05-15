@@ -1,0 +1,156 @@
+#!/bin/bash
+
+scriptDir=$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd -P)
+
+dataDir="${scriptDir}/data"
+backupDir="${scriptDir}/backup"
+force=false
+
+logsFile="${dataDir}/logs"
+
+if [ ! -d "${dataDir}" ]; then
+	if ! mkdir -p "${dataDir}"; then
+		echo nepodarilo sa vytvorit adresar "${dataDir}" >&2
+		return 1
+	fi
+fi
+
+if [ ! -d "${backupDir}" ]; then
+	if ! mkdir -p "${backupDir}"; then
+		echo nepodarilo sa vytvorit adresar "${backupDir}" >&2
+		return 1
+	fi
+fi
+
+if [ ! -f "${logsFile}" ]; then
+	if ! touch "${logsFile}"; then
+		echo nepodarilo sa vytvorit subor "${logsFile}" >&2
+		return 1
+	fi
+fi
+
+logMessage="$(date "+%Y-%m-%d %H:%M.%S") $$ ${LOGNAME:-x} $0 $@"
+echo "${logMessage}" >> $logsFile
+
+pomoc() {
+	cat << EOF
+pomoooooc
+EOF
+}
+
+parseParams() {
+
+	while :; do
+		case "${1-}" in
+		-f )
+			force=true
+			shift
+			;;
+		-d )
+			dataDir="${2-}"
+			shift
+			;;
+		-b )
+			backupDir="${2-}"
+			shift
+			;;
+		-?*)
+			echo "neznam: $1"
+			return 1
+			;;
+		*) break ;;
+		esac
+		shift
+	done
+
+	args=("$@")
+	command="${args[0]-}"
+
+	case "$command" in
+        "pomoc")
+
+            pomoc
+            return 0
+            ;;
+            
+        "cesta-adresář" | "cesta-adresar")
+
+            if [ "$#" -gt 1 ]; then
+				echo "nadbytecne parametry" >&2
+				return 1
+			fi
+
+            echo "$dataDir"
+            return 0
+            ;;
+            
+        "smaž-adresář" | "smaz-adresar")
+
+            if [ "$#" -gt 1 ]; then
+				echo "nadbytecne parametry" >&2
+				return 1
+			fi
+
+            if [[ "$force" != true ]]; then
+                echo "neni -f" >&2
+                return 1
+            fi
+
+            rm -rf "$dataDir"
+            return 0
+            ;;
+            
+        "log-výběr" | "log-vyber")
+
+            if [ ${#args[@]} -ge 2 ]; then
+
+                regex="${args[1]}"
+
+                if ! grep -qE "$regex" "$logsFile"; then
+                    echo "zadna zhoda" >&2
+                    return 1
+                fi
+
+                grep -E "$regex" "$logsFile"
+				
+            else
+                cat "$logsFile"
+            fi
+
+            return 0
+            ;;
+            
+        "log-poslední" | "log-posledni")
+
+            count=10
+
+            if [ ${#args[@]} -ge 2 ]; then
+
+                if [[ "${args[1]}" =~ ^[0-9]+$ ]]; then
+                    count="${args[1]}"
+                else
+                    echo "musi byt cislo" >&2
+                    return 1
+                fi
+
+            fi
+            
+            if [ ${#args[@]} -eq 1 ]; then
+                tail -n "$count" "$logsFile" | nl -ba | sort -nr
+            else
+                tail -n "$count" "$logsFile"
+            fi
+
+            return 0
+            ;;
+            
+        *)
+            die "neznam prikaz: ${command:-<empty>}"
+            ;;
+    esac
+
+	return 0
+}
+
+parseParams "$@"
+
