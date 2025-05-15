@@ -41,33 +41,17 @@ parseParams() {
 		shift
 	done
 
-	if [[ ! -d "$dataDir" ]]; then
-		if ! mkdir -p "$dataDir"; then
-			die "nepodarilo sa vytvorit adresar '${dataDir}'" 1
-		fi
-	fi
-
-	if [[ ! -d "$backupDir" ]]; then
-		if ! mkdir -p "$backupDir"; then
-			die "nepodarilo sa vytvorit adresar '${backupDir}'" 1
-		fi
+	if [[ ! -d "$dataDir" ]] && ! mkdir -p "$dataDir"; then
+		die "nepodarilo sa vytvorit adresar '${dataDir}'" 1
 	fi
 
 	logsFile="${dataDir}/logs"
 
-	if [[ ! -f "$logsFile" ]]; then
-		if ! touch "$logsFile"; then
-			die "nepodarilo sa vytvorit subor '${logsFile}'" 1
-		fi
+	if [[ ! -f "$logsFile" ]] && ! touch "$logsFile"; then
+		die "nepodarilo sa vytvorit subor '${logsFile}'" 1
 	fi
 
 	facultiesFile="${dataDir}/faculties"
-
-	if [[ ! -f "$facultiesFile" ]]; then
-		if ! touch "$facultiesFile"; then
-			die "nepodarilo sa vytvorit subor '${facultiesFile}'" 1
-		fi
-	fi
 
 	logMessage="$(date "+%Y-%m-%d %H:%M.%S") $$ ${LOGNAME:-x} $0 $@"
 	echo "$logMessage" >> $logsFile
@@ -162,6 +146,10 @@ parseParams() {
 				die "nadbytecne parametry" 1
 			fi
 
+			if [[ ! -f "$facultiesFile" ]]; then
+				die "fakulty nene" 1
+			fi
+
 			printf "%-8s | %s\n" "Fakulta" "Název"
 			printf "%s\n" "--------------------------"
 
@@ -199,6 +187,10 @@ parseParams() {
                 die "chyby id" 1
             fi
 
+			if [[ ! -f "$facultiesFile" ]]; then
+				die "fakulty nene" 1
+			fi
+
 			local id="${args[1]}"
 
 			if ! grep -q "^${id}|" "$facultiesFile"; then
@@ -229,6 +221,10 @@ parseParams() {
                 die "chyby id nebo nazev" 1
             fi
 
+			if [[ ! -f "$facultiesFile" ]] && ! touch "$facultiesFile"; then
+				die "nepodarilo sa vytvorit subor '${facultiesFile}'" 1
+			fi
+
 			local id="${args[1]}"
 			local name="${args[2]}"
 			
@@ -247,6 +243,8 @@ parseParams() {
 
         "fakulta-název" | "fakulta-nazev")
 
+			# TODO: Nelze smazat fakultu, která je použita v registru semestrů (tato podmínka se kontroluje až v rámci kontroly sekce nastavování semestrů).
+
             if [[ "$#" -gt 3 ]]; then
 				die "nadbytecne parametry" 1
 			fi
@@ -254,6 +252,10 @@ parseParams() {
 			if [[ $# -lt 3 ]]; then
                 die "chyby id nebo nazev" 1
             fi
+
+			if [[ ! -f "$facultiesFile" ]]; then
+				die "fakulty nene" 1
+			fi
 
 			local id="${args[1]}"
 			local name="${args[2]}"
@@ -274,6 +276,25 @@ parseParams() {
 			done < "$facultiesFile"
 
 			mv "$tempFile" "$facultiesFile"
+
+			exit 0
+			;;
+
+		"záloha" | "zaloha")
+
+            if [[ "$#" -gt 1 ]]; then
+				die "nadbytecne parametry" 1
+			fi
+
+			if [[ ! -d "$backupDir" ]] && ! mkdir -p "$backupDir"; then
+				die "nepodarilo sa vytvorit adresar '${backupDir}'" 1
+			fi
+
+			local backupFile="${backupDir}/$(date '+%Y-%m-%d_%H-%M-%S').tar.gz"
+    
+			if ! tar -czf "$backupFile" -C "$dataDir" .; then
+				die "nepodarilo se vytvorit zalohu" 1
+			fi
 
 			exit 0
 			;;
