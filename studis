@@ -6,12 +6,15 @@ dataDir="${scriptDir}/data"
 backupDir="${scriptDir}/backup"
 force=false
 
-logsFile="${dataDir}/logs"
-
 pomoc() {
 	cat << EOF
 pomoooooc
 EOF
+}
+
+die() {
+	echo "$1" >&2
+	exit "$2"
 }
 
 parseParams() {
@@ -31,37 +34,43 @@ parseParams() {
 			shift
 			;;
 		-?*)
-			echo "neznam: $1"
-			return 1
+			die "neznam: '$1'" 1
 			;;
 		*) break ;;
 		esac
 		shift
 	done
 
-	if [ ! -d "${dataDir}" ]; then
-		if ! mkdir -p "${dataDir}"; then
-			echo nepodarilo sa vytvorit adresar "${dataDir}" >&2
-			return 1
+	if [[ ! -d "$dataDir" ]]; then
+		if ! mkdir -p "$dataDir"; then
+			die "nepodarilo sa vytvorit adresar '${dataDir}'" 1
 		fi
 	fi
 
-	if [ ! -d "${backupDir}" ]; then
-		if ! mkdir -p "${backupDir}"; then
-			echo nepodarilo sa vytvorit adresar "${backupDir}" >&2
-			return 1
+	if [[ ! -d "$backupDir" ]]; then
+		if ! mkdir -p "$backupDir"; then
+			die "nepodarilo sa vytvorit adresar '${backupDir}'" 1
 		fi
 	fi
 
-	if [ ! -f "${logsFile}" ]; then
-		if ! touch "${logsFile}"; then
-			echo nepodarilo sa vytvorit subor "${logsFile}" >&2
-			return 1
+	logsFile="${dataDir}/logs"
+
+	if [[ ! -f "$logsFile" ]]; then
+		if ! touch "$logsFile"; then
+			die "nepodarilo sa vytvorit subor '${logsFile}'" 1
+		fi
+	fi
+
+	facultiesFile="${dataDir}/faculties"
+
+	if [[ ! -f "$facultiesFile" ]]; then
+		if ! touch "$facultiesFile"; then
+			die "nepodarilo sa vytvorit subor '${facultiesFile}'" 1
 		fi
 	fi
 
 	logMessage="$(date "+%Y-%m-%d %H:%M.%S") $$ ${LOGNAME:-x} $0 $@"
-	echo "${logMessage}" >> $logsFile
+	echo "$logMessage" >> $logsFile
 
 	args=("$@")
 	command="${args[0]-}"
@@ -70,45 +79,45 @@ parseParams() {
         "pomoc")
 
             pomoc
-            return 0
+            exit 0
             ;;
             
         "cesta-adresář" | "cesta-adresar")
 
-            if [ "$#" -gt 1 ]; then
-				echo "nadbytecne parametry" >&2
-				return 1
+            if [[ "$#" -gt 1 ]]; then
+				die "nadbytecne parametry" 1
 			fi
 
             echo "$dataDir"
-            return 0
+            exit 0
             ;;
             
         "smaž-adresář" | "smaz-adresar")
 
-            if [ "$#" -gt 1 ]; then
-				echo "nadbytecne parametry" >&2
-				return 1
+            if [[ "$#" -gt 1 ]]; then
+				die "nadbytecne parametry" 1
 			fi
 
             if [[ "$force" != true ]]; then
-                echo "neni -f" >&2
-                return 1
+                die "neni -f" 1
             fi
 
             rm -rf "$dataDir"
-            return 0
+            exit 0
             ;;
             
         "log-výběr" | "log-vyber")
 
-            if [ ${#args[@]} -ge 2 ]; then
+            if [[ "$#" -gt 2 ]]; then
+				die "nadbytecne parametry" 1
+			fi
 
-                regex="${args[1]}"
+            if [[ "$#" -eq 2 ]]; then
+
+                local regex="${args[1]}"
 
                 if ! grep -qE "$regex" "$logsFile"; then
-                    echo "zadna zhoda" >&2
-                    return 1
+                    die "zadna zhoda" 1
                 fi
 
                 grep -E "$regex" "$logsFile"
@@ -117,39 +126,164 @@ parseParams() {
                 cat "$logsFile"
             fi
 
-            return 0
+            exit 0
             ;;
             
         "log-poslední" | "log-posledni")
 
-            count=10
+            if [[ "$#" -gt 2 ]]; then
+				die "nadbytecne parametry" 1
+			fi
 
-            if [ ${#args[@]} -ge 2 ]; then
+            local count=10
+
+            if [[ "$#" -eq 2 ]]; then
 
                 if [[ "${args[1]}" =~ ^[0-9]+$ ]]; then
                     count="${args[1]}"
                 else
-                    echo "musi byt cislo" >&2
-                    return 1
+                    die "musi byt cislo" 1
                 fi
 
             fi
             
-            if [ ${#args[@]} -eq 1 ]; then
+            if [[ "$#" -eq 1 ]]; then
                 tail -n "$count" "$logsFile" | nl -ba | sort -nr
             else
                 tail -n "$count" "$logsFile"
             fi
 
-            return 0
+            exit 0
             ;;
+
+		"fakulta-výpis" | "fakulta-vypis")
+
+            if [[ "$#" -gt 2 ]]; then
+				die "nadbytecne parametry" 1
+			fi
+
+			printf "%-8s | %s\n" "Fakulta" "Název"
+			printf "%s\n" "--------------------------"
+
+            if [[ "$#" -eq 2 ]]; then
+
+				local id="${args[1]}"
+
+				local name=$(grep -w "^$id" "$facultiesFile" | cut -d '|' -f 2)
+
+				if [[ -z "$name" ]]; then
+					die "fakulta neexistuje" 1
+				else
+					echo $name
+					exit 0
+				fi
+
+			else
+
+				while IFS="|" read -r idCol nameCol; do
+					printf "%-8s | %s\n" "$idCol" "$nameCol"
+				done < <(sort "$facultiesFile")
+
+			fi
+
+			exit 0
+			;;
+
+		"fakulta-smaž" | "fakulta-smaz")
+
+            if [[ "$#" -gt 2 ]]; then
+				die "nadbytecne parametry" 1
+			fi
+
+			if [[ $# -lt 2 ]]; then
+                die "chyby id" 1
+            fi
+
+			local id="${args[1]}"
+
+			if ! grep -q "^${id}|" "$facultiesFile"; then
+				die "fakulta neexistuje" 1
+			fi
+
+			local tempFile="${dataDir}/tmp"
+			touch "$tempFile"
+
+			while IFS='|' read -r idCol nameCol; do
+				if [[ "$id" != "$idCol" ]]; then
+					echo "${idCol}|${nameCol}" >> "$tempFile"
+				fi
+			done < "$facultiesFile"
+
+			mv "$tempFile" "$facultiesFile"
+
+			exit 0
+			;;
+
+        "fakulta-nová" | "fakulta-nova")
+
+            if [[ "$#" -gt 3 ]]; then
+				die "nadbytecne parametry" 1
+			fi
+
+			if [[ $# -lt 3 ]]; then
+                die "chyby id nebo nazev" 1
+            fi
+
+			local id="${args[1]}"
+			local name="${args[2]}"
+			
+			if [[ ${#id} -gt 8 ]]; then
+				die "id prilis dlouhe" 1
+			fi
+			
+			if grep -q "^${id}|" "$facultiesFile"; then
+				die "fakulta jiz existuje" 1
+			fi
+			
+			echo "${id}|${name}" >> "$facultiesFile"
+
+			exit 0
+			;;
+
+        "fakulta-název" | "fakulta-nazev")
+
+            if [[ "$#" -gt 3 ]]; then
+				die "nadbytecne parametry" 1
+			fi
+
+			if [[ $# -lt 3 ]]; then
+                die "chyby id nebo nazev" 1
+            fi
+
+			local id="${args[1]}"
+			local name="${args[2]}"
+
+			if ! grep -q "^${id}|" "$facultiesFile"; then
+				die "fakulta neexistuje" 1
+			fi
+
+			local tempFile="${dataDir}/tmp"
+			touch "$tempFile"
+
+			while IFS='|' read -r idCol nameCol; do
+				if [[ "$id" == "$idCol" ]]; then
+					echo "${id}|${name}" >> "$tempFile"
+				else
+					echo "${idCol}|${nameCol}" >> "$tempFile"
+				fi
+			done < "$facultiesFile"
+
+			mv "$tempFile" "$facultiesFile"
+
+			exit 0
+			;;
             
         *)
             die "neznam prikaz: ${command:-<empty>}"
             ;;
     esac
 
-	return 0
+	exit 0
 }
 
 parseParams "$@"
