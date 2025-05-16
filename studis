@@ -19,6 +19,21 @@ die() {
 	exit "$2"
 }
 
+validateArgs() {
+
+	local argsNum=$(($1 - 1))
+	local min="$2"
+	local max="$3"
+
+	if [[ "$argsNum" -lt "$min" ]]; then
+		die "nedostatek parametru" 1
+    fi
+
+    if [[ "$argsNum" -gt "$max" ]]; then
+		die "nadbytecne parametry" 1
+    fi
+}
+
 parseParams() {
 
 	while :; do
@@ -70,9 +85,7 @@ parseParams() {
             
         "cesta-adresář" | "cesta-adresar")
 
-            if [[ "$#" -gt 1 ]]; then
-				die "nadbytecne parametry" 1
-			fi
+			validateArgs "$#" 0 0
 
             echo "$dataDir"
             exit 0
@@ -80,9 +93,7 @@ parseParams() {
             
         "smaž-adresář" | "smaz-adresar")
 
-            if [[ "$#" -gt 1 ]]; then
-				die "nadbytecne parametry" 1
-			fi
+			validateArgs "$#" 0 0
 
             if [[ "$force" != true ]]; then
                 die "neni -f" 1
@@ -94,9 +105,7 @@ parseParams() {
             
         "log-výběr" | "log-vyber")
 
-            if [[ "$#" -gt 2 ]]; then
-				die "nadbytecne parametry" 1
-			fi
+			validateArgs "$#" 0 1
 
             if [[ "$#" -eq 2 ]]; then
 
@@ -117,9 +126,7 @@ parseParams() {
             
         "log-poslední" | "log-posledni")
 
-            if [[ "$#" -gt 2 ]]; then
-				die "nadbytecne parametry" 1
-			fi
+			validateArgs "$#" 0 1
 
             local count=10
 
@@ -144,9 +151,7 @@ parseParams() {
 
 		"fakulta-výpis" | "fakulta-vypis")
 
-            if [[ "$#" -gt 2 ]]; then
-				die "nadbytecne parametry" 1
-			fi
+			validateArgs "$#" 0 1
 
 			if [[ ! -f "$facultiesFile" ]]; then
 				die "fakulty nene" 1
@@ -181,13 +186,7 @@ parseParams() {
 
 		"fakulta-smaž" | "fakulta-smaz")
 
-            if [[ "$#" -gt 2 ]]; then
-				die "nadbytecne parametry" 1
-			fi
-
-			if [[ $# -lt 2 ]]; then
-                die "chyby id" 1
-            fi
+			validateArgs "$#" 1 1
 
 			if [[ ! -f "$facultiesFile" ]]; then
 				die "fakulty nene" 1
@@ -215,13 +214,7 @@ parseParams() {
 
         "fakulta-nová" | "fakulta-nova")
 
-            if [[ "$#" -gt 3 ]]; then
-				die "nadbytecne parametry" 1
-			fi
-
-			if [[ $# -lt 3 ]]; then
-                die "chyby id nebo nazev" 1
-            fi
+			validateArgs "$#" 2 2
 
 			if [[ ! -f "$facultiesFile" ]] && ! touch "$facultiesFile"; then
 				die "nepodarilo sa vytvorit subor '${facultiesFile}'" 1
@@ -247,13 +240,7 @@ parseParams() {
 
 			# TODO: Nelze smazat fakultu, která je použita v registru semestrů (tato podmínka se kontroluje až v rámci kontroly sekce nastavování semestrů).
 
-            if [[ "$#" -gt 3 ]]; then
-				die "nadbytecne parametry" 1
-			fi
-
-			if [[ $# -lt 3 ]]; then
-                die "chyby id nebo nazev" 1
-            fi
+			validateArgs "$#" 2 2
 
 			if [[ ! -f "$facultiesFile" ]]; then
 				die "fakulty nene" 1
@@ -284,9 +271,7 @@ parseParams() {
 
 		"záloha" | "zaloha")
 
-            if [[ "$#" -gt 1 ]]; then
-				die "nadbytecne parametry" 1
-			fi
+			validateArgs "$#" 0 0
 
 			if [[ ! -d "$backupDir" ]] && ! mkdir -p "$backupDir"; then
 				die "nepodarilo sa vytvorit adresar '${backupDir}'" 1
@@ -303,9 +288,7 @@ parseParams() {
 
 		"zálohy" | "zalohy")
 
-            if [[ "$#" -gt 1 ]]; then
-				die "nadbytecne parametry" 1
-			fi
+			validateArgs "$#" 0 0
 
 			if [[ ! -d "$backupDir" ]]; then
 				die "zalohy nene" 1
@@ -318,9 +301,7 @@ parseParams() {
 			
 		"zálohy-smaž" | "zalohy-smaz")
 
-            if [[ "$#" -gt 1 ]]; then
-				die "nadbytecne parametry" 1
-			fi
+			validateArgs "$#" 0 0
 
 			if [[ ! -d "$backupDir" ]]; then
 				die "zalohy nene" 1
@@ -339,13 +320,7 @@ parseParams() {
 
 		"obnova")
 
-            if [[ "$#" -gt 2 ]]; then
-				die "nadbytecne parametry" 1
-			fi
-
-			if [[ $# -lt 2 ]]; then
-                die "chyby timestamp" 1
-            fi
+			validateArgs "$#" 1 1
 
 			if [[ ! -d "$backupDir" ]]; then
 				die "zalohy nene" 1
@@ -366,9 +341,7 @@ parseParams() {
 
 		"data-md5")
 
-            if [[ "$#" -gt 2 ]]; then
-				die "nadbytecne parametry" 1
-			fi
+			validateArgs "$#" 0 0
 
 			for fileName in "${order[@]}"; do
 
@@ -387,9 +360,7 @@ parseParams() {
 
 		"data-velikost")
 
-            if [[ "$#" -gt 2 ]]; then
-				die "nadbytecne parametry" 1
-			fi
+			validateArgs "$#" 0 0
 
 			for fileName in "${order[@]}"; do
 
@@ -411,16 +382,15 @@ parseParams() {
 
 		"data-čas" | "data-cas")
 
-            if [[ "$#" -gt 2 ]]; then
-				die "nadbytecne parametry" 1
-			fi
+			validateArgs "$#" 0 0
 
 			for fileName in "${order[@]}"; do
 
 				local filePath="${dataDir}/${fileName}" 
 
 				if [[ -f "$filePath" ]]; then
-					printf "%-4s %s\n" "$fileName" $(stat -c "%y" "$filePath" | cut -d '.' -f1)
+					echo ahoj
+					# printf "%-4s %s\n" "$fileName" $(stat -c "%y" "$filePath" | cut -d '.' -f1)
 				else
 					printf "%-4s %s\n" "$fileName" "0000-00-00 00:00:00"
 				fi
