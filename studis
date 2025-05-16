@@ -6,6 +6,8 @@ dataDir="${scriptDir}/data"
 backupDir="${scriptDir}/backup"
 force=false
 
+order=("log" "fak" "sem" "pre" "stu" "zap" "zna")
+
 pomoc() {
 	cat << EOF
 pomoooooc
@@ -45,13 +47,13 @@ parseParams() {
 		die "nepodarilo sa vytvorit adresar '${dataDir}'" 1
 	fi
 
-	logsFile="${dataDir}/logs"
+	logsFile="${dataDir}/log"
 
 	if [[ ! -f "$logsFile" ]] && ! touch "$logsFile"; then
 		die "nepodarilo sa vytvorit subor '${logsFile}'" 1
 	fi
 
-	facultiesFile="${dataDir}/faculties"
+	facultiesFile="${dataDir}/fak"
 
 	logMessage="$(date "+%Y-%m-%d %H:%M.%S") $$ ${LOGNAME:-x} $0 $@"
 	echo "$logMessage" >> $logsFile
@@ -358,6 +360,72 @@ parseParams() {
 			if ! tar -xzf "${backupDir}/${backupFile}" -C "$dataDir"; then
 				die "chyba pri obnove" 1
 			fi
+
+			exit 0
+			;;
+
+		"data-md5")
+
+            if [[ "$#" -gt 2 ]]; then
+				die "nadbytecne parametry" 1
+			fi
+
+			for fileName in "${order[@]}"; do
+
+				local filePath="${dataDir}/${fileName}" 
+
+				if [[ -f "$filePath" ]]; then
+					printf "%-4s %s\n" "$fileName" $(md5sum "$filePath" | cut -d ' ' -f1)
+				else
+					printf "%-4s %s\n" "$fileName" "d41d8cd98f00b204e9800998ecf8427e"
+				fi
+
+			done
+
+			exit 0
+			;;
+
+		"data-velikost")
+
+            if [[ "$#" -gt 2 ]]; then
+				die "nadbytecne parametry" 1
+			fi
+
+			for fileName in "${order[@]}"; do
+
+				local filePath="${dataDir}/${fileName}" 
+
+				if [[ -f "$filePath" ]]; then
+
+					# TODO mozna bude potreba pro IS
+					printf "%-4s %s\n" "$fileName" $(stat -c%z "$filePath")
+					# printf "%-4s %s\n" "$fileName" $(stat -f%z "$filePath")
+				else
+					printf "%-4s %s\n" "$fileName" "0"
+				fi
+
+			done
+
+			exit 0
+			;;
+
+		"data-čas" | "data-cas")
+
+            if [[ "$#" -gt 2 ]]; then
+				die "nadbytecne parametry" 1
+			fi
+
+			for fileName in "${order[@]}"; do
+
+				local filePath="${dataDir}/${fileName}" 
+
+				if [[ -f "$filePath" ]]; then
+					printf "%-4s %s\n" "$fileName" $(stat -c "%y" "$filePath" | cut -d '.' -f1)
+				else
+					printf "%-4s %s\n" "$fileName" "0000-00-00 00:00:00"
+				fi
+
+			done
 
 			exit 0
 			;;
