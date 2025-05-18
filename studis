@@ -36,6 +36,8 @@ validateArgs() {
 
 parseParams() {
 
+	local inputParams="$@"
+
 	while :; do
 		case "${1-}" in
 		-f )
@@ -62,19 +64,19 @@ parseParams() {
 		die "nepodarilo sa vytvorit adresar '${dataDir}'" 1
 	fi
 
-	logsFile="${dataDir}/log"
+	local logsFile="${dataDir}/log"
 
 	if [[ ! -f "$logsFile" ]] && ! touch "$logsFile"; then
 		die "nepodarilo sa vytvorit subor '${logsFile}'" 1
 	fi
 
-	facultiesFile="${dataDir}/fak"
+	local facultiesFile="${dataDir}/fak"
 
-	logMessage="$(date "+%Y-%m-%d %H:%M.%S") $$ ${LOGNAME:-x} $0 $@"
+	local logMessage="$(date "+%Y-%m-%d %H:%M.%S") $$ ${LOGNAME:-x} $0 $inputParams"
 	echo "$logMessage" >> $logsFile
 
-	args=("$@")
-	command="${args[0]-}"
+	local args=("$@")
+	local command="${args[0]-}"
 
 	case "$command" in
         "pomoc")
