@@ -67,10 +67,11 @@ parseParams() {
 	local logsFile="${dataDir}/log"
 
 	if [[ ! -f "$logsFile" ]] && ! touch "$logsFile"; then
-		die "nepodarilo sa vytvorit subor '${logsFile}'" 1
+		die "nepodarilo sa vytvorit soubor '${logsFile}'" 1
 	fi
 
 	local facultiesFile="${dataDir}/fak"
+	local semestersFile="${dataDir}/sem"
 
 	local logMessage="$(date "+%Y-%m-%d %H:%M.%S") $$ ${LOGNAME:-x} $0 $inputParams"
 	echo "$logMessage" >> $logsFile
@@ -109,9 +110,9 @@ parseParams() {
 
 			validateArgs "$#" 0 1
 
-            if [[ "$#" -eq 2 ]]; then
+			local regex="${2}"
 
-                local regex="${args[1]}"
+            if [[ ! -z "$regex" ]]; then
 
                 if ! grep -qE "$regex" "$logsFile"; then
                     die "zadna zhoda" 1
@@ -130,13 +131,11 @@ parseParams() {
 
 			validateArgs "$#" 0 1
 
-            local count=10
+			local count="${2-10}"
 
             if [[ "$#" -eq 2 ]]; then
 
-                if [[ "${args[1]}" =~ ^[0-9]+$ ]]; then
-                    count="${args[1]}"
-                else
+                if [[ ! "$count" =~ ^[0-9]+$ ]]; then
                     die "musi byt cislo" 1
                 fi
 
@@ -162,9 +161,9 @@ parseParams() {
 			printf "%-8s | %s\n" "Fakulta" "Název"
 			printf "%s\n" "--------------------------"
 
-            if [[ "$#" -eq 2 ]]; then
+			local id="${2-}"
 
-				local id="${args[1]}"
+            if [[ ! -z "$id" ]]; then
 
 				local name=$(grep -w "^$id" "$facultiesFile" | cut -d '|' -f 2)
 
@@ -219,7 +218,7 @@ parseParams() {
 			validateArgs "$#" 2 2
 
 			if [[ ! -f "$facultiesFile" ]] && ! touch "$facultiesFile"; then
-				die "nepodarilo sa vytvorit subor '${facultiesFile}'" 1
+				die "nepodarilo sa vytvorit soubor '${facultiesFile}'" 1
 			fi
 
 			local id="${args[1]}"
@@ -391,8 +390,7 @@ parseParams() {
 				local filePath="${dataDir}/${fileName}" 
 
 				if [[ -f "$filePath" ]]; then
-					echo ahoj
-					# printf "%-4s %s\n" "$fileName" $(stat -c "%y" "$filePath" | cut -d '.' -f1)
+					printf "%-4s %s\n" "$fileName" $(stat -c "%y" "$filePath" | cut -d '.' -f1)
 				else
 					printf "%-4s %s\n" "$fileName" "0000-00-00 00:00:00"
 				fi
@@ -401,9 +399,177 @@ parseParams() {
 
 			exit 0
 			;;
+
+		"semestr-datum")
+
+			validateArgs "$#" 3 3
+
+			if [[ ! -f "$semestersFile" ]]; then
+				die "semestry nene" 1
+			fi
+
+			local faculty="${args[1]}"
+			local id="${args[2]}"
+			local start="${args[3]}"
+
+			# TODO overenie formatu datumu z argumentu
+			# toto nefunguje na macu, vyskusat na linuxovej masine
+			# if ! date -d "$date" "+%Y-%m-%d" >/dev/null 2>&1; then
+			# 	die "Neplatný formát data: $date (očekáváno YYYY-MM-DD)"
+			# fi
+
+			# TODO overenie toho ci zadany datum spada do rozmedzia
+
+			if ! grep -q "^${faculty}|${id}" "$semestersFile"; then
+				die "semestr neexistuje" 1
+			fi
+
+			local tempFile="${dataDir}/tmp"
+			touch "$tempFile"
+			
+			while IFS="|" read -r facultyCol idCol startCol nameCol; do
+				if [[ "$faculty" == "$facultyCol" ]] && [[ "$id" == "$idCol" ]]; then
+					echo "${facultyCol}|${idCol}|${start}|${nameCol}" >> "$tempFile"
+				else
+					echo "${facultyCol}|${idCol}|${startCol}|${nameCol}" >> "$tempFile"
+				fi
+			done < "$semestersFile"
+
+			mv "$tempFile" "$semestersFile"
+
+			exit 0
+			;;
+
+		"semestr-název" | "semestr-nazev")
+
+			validateArgs "$#" 3 3
+
+			if [[ ! -f "$semestersFile" ]]; then
+				die "semestry nene" 1
+			fi
+
+			local faculty="${args[1]}"
+			local id="${args[2]}"
+			local name="${args[3]}"
+
+			if ! grep -q "^${faculty}|${id}" "$semestersFile"; then
+				die "semestr neexistuje" 1
+			fi
+
+			local tempFile="${dataDir}/tmp"
+			touch "$tempFile"
+			
+			while IFS="|" read -r facultyCol idCol startCol nameCol; do
+				if [[ "$faculty" == "$facultyCol" ]] && [[ "$id" == "$idCol" ]]; then
+					echo "${facultyCol}|${idCol}|${startCol}|${name}" >> "$tempFile"
+				else
+					echo "${facultyCol}|${idCol}|${startCol}|${nameCol}" >> "$tempFile"
+				fi
+			done < "$semestersFile"
+
+			mv "$tempFile" "$semestersFile"
+
+			exit 0
+			;;
+
+		"semestr-výpis" | "semestr-vypis")
+
+			validateArgs "$#" 0 2
+
+			if [[ ! -f "$semestersFile" ]]; then
+				die "semestry nene" 1
+			fi
+
+			printf "%-8s | %s | %s | %s\n" "Fakulta" "Semestr" "Od" "Název"
+			printf "%s\n" "-----------------------------------------"
+
+			local faculty="${2-}"
+			local semester="${3-}"
+
+			(
+				if [[ ! -z "$semester" ]]; then
+					grep "^${faculty}|${semester}" "$semestersFile"
+				elif [[ ! -z "$faculty" ]]; then
+					grep "^${faculty}" "$semestersFile"
+				else
+					cat "$semestersFile"
+				fi
+			) | while IFS="|" read -r facultyCol idCol startCol nameCol; do
+				printf "%-8s | %s | %s | %s\n" "$facultyCol" "$idCol" "$startCol" "$nameCol"
+			done | sort -t "|" -k3,3 -k1,1
+
+			exit 0
+			;;
+
+		"semestr-smaž" | "semestr-smaz")
+
+			validateArgs "$#" 2 2
+
+			if [[ ! -f "$semestersFile" ]]; then
+				die "semestry nene" 1
+			fi
+
+			local faculty="${args[1]}"
+			local id="${args[2]}"
+
+			if ! grep -q "^${faculty}|${id}" "$semestersFile"; then
+				die "semestr neexistuje" 1
+			fi
+
+			local tempFile="${dataDir}/tmp"
+			touch "$tempFile"
+			
+			while IFS="|" read -r facultyCol idCol startCol nameCol; do
+				if [[ "$faculty" != "$facultyCol" ]] || [[ "$id" != "$idCol" ]]; then
+					echo "${facultyCol}|${idCol}|${startCol}|${nameCol}" >> "$tempFile"
+				fi
+			done < "$semestersFile"
+
+			mv "$tempFile" "$semestersFile"
+
+			exit 0
+			;;
+
+		"semestr-nový" | "semestr-novy")
+
+			validateArgs "$#" 4 4
+
+			if [[ ! -f "$semestersFile" ]] && ! touch "$semestersFile"; then
+				die "nepodarilo sa vytvorit soubor '${semestersFile}'" 1
+			fi
+
+			local faculty="${args[1]}"
+			local id="${args[2]}"
+			local start="${args[3]}"
+			local name="${args[4]}"
+			
+			if [[ ${#id} -gt 8 ]]; then
+				die "id prilis dlouhe" 1
+			fi
+
+			# TODO overenie formatu datumu z argumentu
+			# toto nefunguje na macu, vyskusat na linuxovej masine
+			# if ! date -d "$date" "+%Y-%m-%d" >/dev/null 2>&1; then
+			# 	die "Neplatný formát data: $date (očekáváno YYYY-MM-DD)"
+			# fi
+
+			# TODO overenie toho ci zadany datum spada do rozmedzia
+			
+			if [[ ! -f "$facultiesFile" ]]; then
+				die "semestry nene" 1
+			fi
+
+			if grep -q "^${faculty}|${id}" "$semestersFile"; then
+				die "semestr jiz existuje" 1
+			fi
+
+			echo "${faculty}|${id}|${start}|${name}" >> "$semestersFile"
+
+			exit 0
+			;;
 					
         *)
-            die "neznam prikaz: ${command:-<empty>}"
+            die "neznamy prikaz" 1
             ;;
     esac
 
