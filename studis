@@ -72,6 +72,7 @@ parseParams() {
 
 	local facultiesFile="${dataDir}/fak"
 	local semestersFile="${dataDir}/sem"
+	local courseFile="${dataDir}/pre"
 
 	local logMessage="$(date "+%Y-%m-%d %H:%M.%S") $$ ${LOGNAME:-x} $0 $inputParams"
 	echo "$logMessage" >> $logsFile
@@ -369,7 +370,6 @@ parseParams() {
 
 				if [[ -f "$filePath" ]]; then
 
-					# TODO mozna bude potreba pro IS
 					printf "%-4s %s\n" "$fileName" $(stat -c%z "$filePath")
 					# printf "%-4s %s\n" "$fileName" $(stat -f%z "$filePath")
 				else
@@ -486,17 +486,17 @@ parseParams() {
 			local faculty="${2-}"
 			local semester="${3-}"
 
-			(
-				if [[ ! -z "$semester" ]]; then
-					grep "^${faculty}|${semester}" "$semestersFile"
-				elif [[ ! -z "$faculty" ]]; then
-					grep "^${faculty}" "$semestersFile"
-				else
-					cat "$semestersFile"
+			while IFS="|" read -r facultyCol idCol startCol nameCol; do
+
+				if [[ ! -z "$semester" ]] && [[ "$semester" != "$idCol" ]]; then
+					continue
+				elif [[ ! -z "$faculty" ]] && [[ "$faculty" != "$facultyCol" ]]; then
+					continue
 				fi
-			) | while IFS="|" read -r facultyCol idCol startCol nameCol; do
-				printf "%-8s | %s | %s | %s\n" "$facultyCol" "$idCol" "$startCol" "$nameCol"
-			done | sort -t "|" -k3,3 -k1,1
+
+				printf "%s | %s | %s | %s\n" "$facultyCol" "$idCol" "$startCol" "$nameCol"
+
+			done < <(sort -t "|" -k3,3 -k1,1 "$semestersFile")
 
 			exit 0
 			;;
@@ -555,8 +555,8 @@ parseParams() {
 
 			# TODO overenie toho ci zadany datum spada do rozmedzia
 			
-			if [[ ! -f "$facultiesFile" ]]; then
-				die "semestry nene" 1
+			if [[ ! -f "$facultiesFile" ]] || ! grep -q "^${faculty}" "$facultiesFile"; then
+				die "fakulta neexistuje" 1
 			fi
 
 			if grep -q "^${faculty}|${id}" "$semestersFile"; then
@@ -567,7 +567,235 @@ parseParams() {
 
 			exit 0
 			;;
-					
+
+		"předmět-výpis" | "predmet-vypis")
+
+			validateArgs "$#" 0 3
+
+			if [[ ! -f "$courseFile" ]]; then
+				die "predmety nene '${courseFile}'" 1
+			fi
+
+			printf "%s | %s | %s | %s | %s | %s\n" "Fakulta" "Semestr" "Kurz" "Uk" "Kr" "Název"
+			printf "%s\n" "----------------------------------------------------"
+
+			if [[ ! -f "$courseFile" ]]; then
+				die "semestry nene" 1
+			fi
+
+			local faculty="${2-}"
+			local semester="${3-}"
+			local code="${4-}"
+
+			local found=false
+
+			while IFS="|" read -r facultyCol semesterCol codeCol nameCol typeCol creditsCol; do
+
+				if [[ ! -z "$code" ]] && [[ "$code" != "$codeCol" ]]; then
+					continue
+				elif [[ ! -z "$semester" ]] && [[ "$semester" != "$semesterCol" ]]; then
+					continue
+				elif [[ ! -z "$faculty" ]] && [[ "$faculty" != "$facultyCol" ]]; then
+					continue
+				fi
+
+				found=true
+
+				# TODO vycentrovat, vsude
+				printf "%s | %s | %s | %s | %s | %s\n" "$facultyCol" "$semesterCol" "$codeCol" "$typeCol" "$creditsCol" "$nameCol"
+
+			done < <(sort -t "|" -k1,1 -k2,2 -k3,3 "$courseFile")
+
+			if [[ "$found" != true ]]; then
+				die "nic se nenaslo" 1
+			fi
+
+			exit 0
+			;;
+
+		"předmět-smaž" | "predmet-smaz")
+
+			validateArgs "$#" 3 3
+
+			if [[ ! -f "$courseFile" ]]; then
+				die "predmety nene" 1
+			fi
+
+			local faculty="${args[1]}"
+			local semester="${args[2]}"
+			local code="${args[3]}"
+
+			if ! grep -q "^${faculty}|${semester}|${code}" "$courseFile"; then
+				die "predmet neexistuje" 1
+			fi
+
+			# TODO Nelze smazat předmět, který má student zapsaný
+
+			local tempFile="${dataDir}/tmp"
+			touch "$tempFile"
+			
+			while IFS="|" read -r facultyCol semesterCol codeCol nameCol typeCol creditsCol; do
+				if [[ "$faculty" != "$facultyCol" ]] || [[ "$semester" != "$semesterCol" ]] || [[ "$code" != "$codeCol" ]]; then
+					echo "${facultyCol}|${semesterCol}|${codeCol}|${nameCol}|${typeCol}|${creditsCol}" >> "$tempFile"
+				fi
+			done < "$courseFile"
+
+			mv "$tempFile" "$courseFile"
+
+			exit 0
+			;;
+
+		"předmět-ukončení" | "predmet-ukonceni")
+
+			validateArgs "$#" 4 4
+
+			if [[ ! -f "$courseFile" ]]; then
+				die "predmety nene" 1
+			fi
+
+			local faculty="${args[1]}"
+			local semester="${args[2]}"
+			local code="${args[3]}"
+			local newType="${args[4]}"
+
+			if ! [[ "${newType}" =~ ^(zk|k|z)$ ]]; then
+				die "neplatne zakonceni" 1
+			fi
+
+			if ! grep -q "^${faculty}|${semester}|${code}" "$courseFile"; then
+				die "predmet neexistuje" 1
+			fi
+
+			local tempFile="${dataDir}/tmp"
+			touch "$tempFile"
+			
+			while IFS="|" read -r facultyCol semesterCol codeCol nameCol typeCol creditsCol; do
+				if [[ "$faculty" == "$facultyCol" ]] && [[ "$semester" == "$semesterCol" ]] && [[ "$code" == "$codeCol" ]]; then
+					echo "${facultyCol}|${semesterCol}|${codeCol}|${nameCol}|${newType}|${creditsCol}" >> "$tempFile"
+				else
+					echo "${facultyCol}|${semesterCol}|${codeCol}|${nameCol}|${typeCol}|${creditsCol}" >> "$tempFile"
+				fi
+			done < "$courseFile"
+
+			mv "$tempFile" "$courseFile"
+
+			exit 0
+			;;
+
+		"předmět-nový" | "predmet-novy")
+
+			validateArgs "$#" 6 6
+
+			if [[ ! -f "$courseFile" ]] && ! touch "$courseFile"; then
+				die "nepodarilo sa vytvorit soubor '${courseFile}'" 1
+			fi
+
+			local faculty="${args[1]}"
+			local semester="${args[2]}"
+			local code="${args[3]}"
+			local name="${args[4]}"
+			local type="${args[5]}"
+			local credits="${args[6]}"
+			
+			if [[ ! -f "$facultiesFile" ]] || ! grep -q "^${faculty}" "$facultiesFile"; then
+				die "fakulta neexistuje" 1
+			fi
+			
+			if [[ ! -f "$semestersFile" ]] || ! grep -q "^${faculty}|${id}" "$facultiesFile"; then
+				die "fakulta neexistuje" 1
+			fi
+			
+			if ! [[ "${code}" =~ ^[A-Za-z][A-Za-z0-9_]{0,7}$ ]]; then
+				die "kod predmetu v zlem tvaru" 1
+			fi
+
+			if grep -qi "^[^|]*|[^|]*|${code}|" "$courseFile"; then
+				die "predmet jiz existuje" 1
+			fi
+
+			if ! [[ "${type}" =~ ^(zk|k|z)$ ]]; then
+				die "neplatne zakonceni" 1
+			fi
+
+			if ! [[ "${credits}" =~ ^[0-9]+$ ]] || (( credits < 0 || credits > 20 )); then
+				die "neplatne kredity" 1
+			fi
+
+			echo "${faculty}|${semester}|${code}|${name}|${type}|${credits}" >> "$courseFile"
+
+			exit 0
+			;;
+
+		"předmět-kredity" | "predmet-kredity")
+
+			validateArgs "$#" 4 4
+
+			if [[ ! -f "$courseFile" ]]; then
+				die "predmety nene" 1
+			fi
+
+			local faculty="${args[1]}"
+			local semester="${args[2]}"
+			local code="${args[3]}"
+			local newCredits="${args[4]}"
+
+			if ! [[ "${newCredits}" =~ ^[0-9]+$ ]] || (( newCredits < 0 || newCredits > 20 )); then
+				die "neplatne kredity" 1
+			fi
+
+			if ! grep -q "^${faculty}|${semester}|${code}" "$courseFile"; then
+				die "predmet neexistuje" 1
+			fi
+
+			local tempFile="${dataDir}/tmp"
+			touch "$tempFile"
+			
+			while IFS="|" read -r facultyCol semesterCol codeCol nameCol typeCol creditsCol; do
+				if [[ "$faculty" == "$facultyCol" ]] && [[ "$semester" == "$semesterCol" ]] && [[ "$code" == "$codeCol" ]]; then
+					echo "${facultyCol}|${semesterCol}|${codeCol}|${nameCol}|${typeCol}|${newCredits}" >> "$tempFile"
+				else
+					echo "${facultyCol}|${semesterCol}|${codeCol}|${nameCol}|${typeCol}|${creditsCol}" >> "$tempFile"
+				fi
+			done < "$courseFile"
+
+			mv "$tempFile" "$courseFile"
+
+			exit 0
+			;;
+
+		"předmět-název" | "predmet-nazev")
+
+			validateArgs "$#" 4 4
+
+			if [[ ! -f "$courseFile" ]]; then
+				die "predmety nene" 1
+			fi
+
+			local faculty="${args[1]}"
+			local semester="${args[2]}"
+			local code="${args[3]}"
+			local newName="${args[4]}"
+
+			if ! grep -q "^${faculty}|${semester}|${code}" "$courseFile"; then
+				die "predmet neexistuje" 1
+			fi
+
+			local tempFile="${dataDir}/tmp"
+			touch "$tempFile"
+			
+			while IFS="|" read -r facultyCol semesterCol codeCol nameCol typeCol creditsCol; do
+				if [[ "$faculty" == "$facultyCol" ]] && [[ "$semester" == "$semesterCol" ]] && [[ "$code" == "$codeCol" ]]; then
+					echo "${facultyCol}|${semesterCol}|${codeCol}|${newName}|${typeCol}|${creditsCol}" >> "$tempFile"
+				else
+					echo "${facultyCol}|${semesterCol}|${codeCol}|${nameCol}|${typeCol}|${creditsCol}" >> "$tempFile"
+				fi
+			done < "$courseFile"
+
+			mv "$tempFile" "$courseFile"
+
+			exit 0
+			;;
+
         *)
             die "neznamy prikaz" 1
             ;;
