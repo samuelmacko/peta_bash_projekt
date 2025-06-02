@@ -240,8 +240,6 @@ parseParams() {
 
         "fakulta-název" | "fakulta-nazev")
 
-			# TODO: Nelze smazat fakultu, která je použita v registru semestrů (tato podmínka se kontroluje až v rámci kontroly sekce nastavování semestrů).
-
 			validateArgs "$#" 2 2
 
 			if [[ ! -f "$facultiesFile" ]]; then
@@ -253,6 +251,10 @@ parseParams() {
 
 			if ! grep -q "^${id}|" "$facultiesFile"; then
 				die "fakulta neexistuje" 1
+			fi
+
+			if grep -q "^${id}|" "$semestersFile"; then
+				die "na fakulte je semestr" 1
 			fi
 
 			local tempFile="${dataDir}/tmp"
@@ -412,13 +414,16 @@ parseParams() {
 			local id="${args[2]}"
 			local start="${args[3]}"
 
-			# TODO overenie formatu datumu z argumentu
-			# toto nefunguje na macu, vyskusat na linuxovej masine
-			# if ! date -d "$date" "+%Y-%m-%d" >/dev/null 2>&1; then
-			# 	die "Neplatný formát data: $date (očekáváno YYYY-MM-DD)"
-			# fi
+			if ! date -d "$start" "+%Y-%m-%d" >/dev/null 2>&1; then
+				die "zly format datumu" 1
+			fi
 
-			# TODO overenie toho ci zadany datum spada do rozmedzia
+			local minDate="2000-01-01"
+			local maxDate=$(date -d "+2 years" "+%Y-%m-%d")
+
+			if [[ "$start" < "$minDate" ]] || [[ "$start" > "$maxDate" ]]; then
+				die "zly datum" 1
+			fi
 
 			if ! grep -q "^${faculty}|${id}" "$semestersFile"; then
 				die "semestr neexistuje" 1
@@ -547,13 +552,16 @@ parseParams() {
 				die "id prilis dlouhe" 1
 			fi
 
-			# TODO overenie formatu datumu z argumentu
-			# toto nefunguje na macu, vyskusat na linuxovej masine
-			# if ! date -d "$date" "+%Y-%m-%d" >/dev/null 2>&1; then
-			# 	die "Neplatný formát data: $date (očekáváno YYYY-MM-DD)"
-			# fi
+			if ! date -d "$start" "+%Y-%m-%d" >/dev/null 2>&1; then
+				die "zly format datumu" 1
+			fi
 
-			# TODO overenie toho ci zadany datum spada do rozmedzia
+			local minDate="2000-01-01"
+			local maxDate=$(date -d "+2 years" "+%Y-%m-%d")
+
+			if [[ "$start" < "$minDate" ]] || [[ "$start" > "$maxDate" ]]; then
+				die "zly datum" 1
+			fi
 			
 			if [[ ! -f "$facultiesFile" ]] || ! grep -q "^${faculty}" "$facultiesFile"; then
 				die "fakulta neexistuje" 1
@@ -601,7 +609,6 @@ parseParams() {
 
 				found=true
 
-				# TODO vycentrovat, vsude
 				printf "%s | %s | %s | %s | %s | %s\n" "$facultyCol" "$semesterCol" "$codeCol" "$typeCol" "$creditsCol" "$nameCol"
 
 			done < <(sort -t "|" -k1,1 -k2,2 -k3,3 "$courseFile")
@@ -628,8 +635,6 @@ parseParams() {
 			if ! grep -q "^${faculty}|${semester}|${code}" "$courseFile"; then
 				die "predmet neexistuje" 1
 			fi
-
-			# TODO Nelze smazat předmět, který má student zapsaný
 
 			local tempFile="${dataDir}/tmp"
 			touch "$tempFile"
