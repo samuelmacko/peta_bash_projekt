@@ -6,7 +6,8 @@ dataDir="${scriptDir}/data"
 backupDir="${scriptDir}/backup"
 force=false
 
-order=("log" "fak" "sem" "pre" "stu" "zap" "zna")
+# order=("log" "fak" "sem" "pre" "stu" "zap" "zna")
+order=("log" "fak")
 
 pomoc() {
 	cat << EOF
@@ -42,14 +43,22 @@ parseParams() {
 		case "${1-}" in
 		-f )
 			force=true
-			shift
+			# shift
 			;;
 		-d )
-			dataDir="${2-}"
+			local path="${2-}"
+			if [[ "$path" != /* ]]; then
+				path="$(pwd)/$path"
+			fi
+			dataDir="${path%/}"
 			shift
 			;;
 		-b )
-			backupDir="${2-}"
+			local path="${2-}"
+			if [[ "$path" != /* ]]; then
+				path="$(pwd)/$path"
+			fi
+			backupDir="${path%/}"
 			shift
 			;;
 		-?*)
@@ -61,13 +70,13 @@ parseParams() {
 	done
 
 	if [[ ! -d "$dataDir" ]] && ! mkdir -p "$dataDir"; then
-		die "nepodarilo sa vytvorit adresar '${dataDir}'" 1
+		die "nepodarilo se vytvorit adresar '${dataDir}'" 1
 	fi
 
 	local logsFile="${dataDir}/log"
 
 	if [[ ! -f "$logsFile" ]] && ! touch "$logsFile"; then
-		die "nepodarilo sa vytvorit soubor '${logsFile}'" 1
+		die "nepodarilo se vytvorit soubor '${logsFile}'" 1
 	fi
 
 	local facultiesFile="${dataDir}/fak"
@@ -103,6 +112,8 @@ parseParams() {
                 die "neni -f" 1
             fi
 
+	    # echo "$dataDir"
+
             rm -rf "$dataDir"
             exit 0
             ;;
@@ -116,7 +127,7 @@ parseParams() {
             if [[ ! -z "$regex" ]]; then
 
                 if ! grep -qE "$regex" "$logsFile"; then
-                    die "zadna zhoda" 1
+                    die "" 1
                 fi
 
                 grep -E "$regex" "$logsFile"
@@ -143,7 +154,7 @@ parseParams() {
             fi
             
             if [[ "$#" -eq 1 ]]; then
-                tail -n "$count" "$logsFile" | nl -ba | sort -nr
+                tail -n "$count" "$logsFile" | nl -ba | sort -n
             else
                 tail -n "$count" "$logsFile"
             fi
@@ -171,7 +182,12 @@ parseParams() {
 				if [[ -z "$name" ]]; then
 					die "fakulta neexistuje" 1
 				else
-					echo $name
+					while IFS="|" read -r idCol nameCol; do
+					    if [[ "$name" == "$nameCol" ]]; then
+					        printf "%-8s | %s\n" "$idCol" "$nameCol"
+					    fi
+					done < "$facultiesFile"
+				
 					exit 0
 				fi
 
@@ -198,6 +214,10 @@ parseParams() {
 
 			if ! grep -q "^${id}|" "$facultiesFile"; then
 				die "fakulta neexistuje" 1
+			fi
+
+			if [[ -f "$semestersFile" ]] && grep -q "^${id}|" "$semestersFile"; then
+				die "na fakulte je semestr" 1
 			fi
 
 			local tempFile="${dataDir}/tmp"
@@ -253,9 +273,9 @@ parseParams() {
 				die "fakulta neexistuje" 1
 			fi
 
-			if grep -q "^${id}|" "$semestersFile"; then
-				die "na fakulte je semestr" 1
-			fi
+			# if grep -q "^${id}|" "$semestersFile"; then
+			#	die "na fakulte je semestr" 1
+			# fi
 
 			local tempFile="${dataDir}/tmp"
 			touch "$tempFile"
@@ -278,12 +298,12 @@ parseParams() {
 			validateArgs "$#" 0 0
 
 			if [[ ! -d "$backupDir" ]] && ! mkdir -p "$backupDir"; then
-				die "nepodarilo sa vytvorit adresar '${backupDir}'" 1
+				die "nepodarilo se vytvorit adresar '${backupDir}'" 1
 			fi
 
 			local backupFile="${backupDir}/$(date '+%Y-%m-%d_%H-%M-%S').tar.gz"
     
-			if ! tar -czf "$backupFile" -C "$dataDir" .; then
+			if ! (cd "$dataDir" && zip -rq "$backupFile" ./*); then
 				die "nepodarilo se vytvorit zalohu" 1
 			fi
 
@@ -336,7 +356,7 @@ parseParams() {
 				die "zadana zaloha neexistuje" 1
 			fi
 
-			if ! tar -xzf "${backupDir}/${backupFile}" -C "$dataDir"; then
+			if ! unzip -qo "${backupDir}/${backupFile}" -d "$dataDir"; then
 				die "chyba pri obnove" 1
 			fi
 
@@ -352,9 +372,9 @@ parseParams() {
 				local filePath="${dataDir}/${fileName}" 
 
 				if [[ -f "$filePath" ]]; then
-					printf "%-4s %s\n" "$fileName" $(md5sum "$filePath" | cut -d ' ' -f1)
+					printf "%s %s\n" "$fileName" $(md5sum "$filePath" | cut -d ' ' -f1)
 				else
-					printf "%-4s %s\n" "$fileName" "d41d8cd98f00b204e9800998ecf8427e"
+					printf "%s %s\n" "$fileName" "d41d8cd98f00b204e9800998ecf8427e"
 				fi
 
 			done
@@ -372,10 +392,9 @@ parseParams() {
 
 				if [[ -f "$filePath" ]]; then
 
-					printf "%-4s %s\n" "$fileName" $(stat -c%z "$filePath")
-					# printf "%-4s %s\n" "$fileName" $(stat -f%z "$filePath")
+					printf "%s %s\n" "$fileName" $(stat -c%s "$filePath")
 				else
-					printf "%-4s %s\n" "$fileName" "0"
+					printf "%s %s\n" "$fileName" "0"
 				fi
 
 			done
@@ -392,9 +411,11 @@ parseParams() {
 				local filePath="${dataDir}/${fileName}" 
 
 				if [[ -f "$filePath" ]]; then
-					printf "%-4s %s\n" "$fileName" $(stat -c "%y" "$filePath" | cut -d '.' -f1)
+					printf "%s %s %s\n" "$fileName" $(stat -c%y "$filePath" | cut -d'.' -f1)
+					# printf "%s %s %s\n" "$fileName" $(ls --full-time "$filePath" | tr -s ' ' | cut -d' ' -f6,7 | cut -d'.' -f1)
+					# printf "%s %s\n" "$fileName" $(ls --full-time "$filePath")
 				else
-					printf "%-4s %s\n" "$fileName" "0000-00-00 00:00:00"
+					printf "%s %s %s\n" "$fileName" "0000-00-00 00:00:00"
 				fi
 
 			done
@@ -485,11 +506,10 @@ parseParams() {
 				die "semestry nene" 1
 			fi
 
-			printf "%-8s | %s | %s | %s\n" "Fakulta" "Semestr" "Od" "Název"
-			printf "%s\n" "-----------------------------------------"
-
 			local faculty="${2-}"
 			local semester="${3-}"
+
+			local found=false
 
 			while IFS="|" read -r facultyCol idCol startCol nameCol; do
 
@@ -499,9 +519,19 @@ parseParams() {
 					continue
 				fi
 
-				printf "%s | %s | %s | %s\n" "$facultyCol" "$idCol" "$startCol" "$nameCol"
+				if [[ "$found" == false ]]; then
+					printf "%-8s | %-8s | %-10s | %s\n" "Fakulta" "Semestr" "Od" "Název"
+					printf "%s\n" "-----------------------------------------"
+					found=true
+				fi
+
+				printf "%-8s | %-8s | %-10s | %s\n" "$facultyCol" "$idCol" "$startCol" "$nameCol"
 
 			done < <(sort -t "|" -k3,3 -k1,1 "$semestersFile")
+
+			if [[ "$found" == false ]]; then
+				die "nic se nenaslo" 1
+			fi
 
 			exit 0
 			;;
@@ -519,6 +549,10 @@ parseParams() {
 
 			if ! grep -q "^${faculty}|${id}" "$semestersFile"; then
 				die "semestr neexistuje" 1
+			fi
+
+			if grep -q "^${faculty}|${id}|" "$courseFile"; then
+				die "semestr ma predmet" 1
 			fi
 
 			local tempFile="${dataDir}/tmp"
@@ -540,7 +574,7 @@ parseParams() {
 			validateArgs "$#" 4 4
 
 			if [[ ! -f "$semestersFile" ]] && ! touch "$semestersFile"; then
-				die "nepodarilo sa vytvorit soubor '${semestersFile}'" 1
+				die "nepodarilo se vytvorit soubor '${semestersFile}'" 1
 			fi
 
 			local faculty="${args[1]}"
@@ -552,8 +586,8 @@ parseParams() {
 				die "id prilis dlouhe" 1
 			fi
 
-			if ! date -d "$start" "+%Y-%m-%d" >/dev/null 2>&1; then
-				die "zly format datumu" 1
+			if ! date -d "$start" "+%Y-%m-%d" >/dev/null 2>&1 || ! [[ "$start" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+				die "spatny format datumu" 1
 			fi
 
 			local minDate="2000-01-01"
@@ -584,9 +618,6 @@ parseParams() {
 				die "predmety nene '${courseFile}'" 1
 			fi
 
-			printf "%s | %s | %s | %s | %s | %s\n" "Fakulta" "Semestr" "Kurz" "Uk" "Kr" "Název"
-			printf "%s\n" "----------------------------------------------------"
-
 			if [[ ! -f "$courseFile" ]]; then
 				die "semestry nene" 1
 			fi
@@ -599,17 +630,21 @@ parseParams() {
 
 			while IFS="|" read -r facultyCol semesterCol codeCol nameCol typeCol creditsCol; do
 
-				if [[ ! -z "$code" ]] && [[ "$code" != "$codeCol" ]]; then
+				if [[ ! -z "$code" ]] && [[ "${code,,}" != "${codeCol,,}" ]]; then
 					continue
 				elif [[ ! -z "$semester" ]] && [[ "$semester" != "$semesterCol" ]]; then
 					continue
 				elif [[ ! -z "$faculty" ]] && [[ "$faculty" != "$facultyCol" ]]; then
 					continue
 				fi
+				
+				if [[ "$found" == false ]]; then
+					printf "%-8s | %-8s | %-8s | %-2s | %2s | %s\n" "Fakulta" "Semestr" "Kurz" "Uk" "Kr" "Název"
+					printf "%s\n" "----------------------------------------------------"
+					found=true
+				fi
 
-				found=true
-
-				printf "%s | %s | %s | %s | %s | %s\n" "$facultyCol" "$semesterCol" "$codeCol" "$typeCol" "$creditsCol" "$nameCol"
+				printf "%-8s | %-8s | %-8s | %-2s | %2s | %s\n" "$facultyCol" "$semesterCol" "$codeCol" "$typeCol" "$creditsCol" "$nameCol"
 
 			done < <(sort -t "|" -k1,1 -k2,2 -k3,3 "$courseFile")
 
@@ -632,7 +667,7 @@ parseParams() {
 			local semester="${args[2]}"
 			local code="${args[3]}"
 
-			if ! grep -q "^${faculty}|${semester}|${code}" "$courseFile"; then
+			if ! grep -qi "^${faculty}|${semester}|${code}" "$courseFile"; then
 				die "predmet neexistuje" 1
 			fi
 
@@ -640,7 +675,7 @@ parseParams() {
 			touch "$tempFile"
 			
 			while IFS="|" read -r facultyCol semesterCol codeCol nameCol typeCol creditsCol; do
-				if [[ "$faculty" != "$facultyCol" ]] || [[ "$semester" != "$semesterCol" ]] || [[ "$code" != "$codeCol" ]]; then
+				if [[ "$faculty" != "$facultyCol" ]] || [[ "$semester" != "$semesterCol" ]] || [[ "${code,,}" != "${codeCol,,}" ]]; then
 					echo "${facultyCol}|${semesterCol}|${codeCol}|${nameCol}|${typeCol}|${creditsCol}" >> "$tempFile"
 				fi
 			done < "$courseFile"
@@ -667,7 +702,7 @@ parseParams() {
 				die "neplatne zakonceni" 1
 			fi
 
-			if ! grep -q "^${faculty}|${semester}|${code}" "$courseFile"; then
+			if ! grep -qi "^${faculty}|${semester}|${code}" "$courseFile"; then
 				die "predmet neexistuje" 1
 			fi
 
@@ -675,7 +710,7 @@ parseParams() {
 			touch "$tempFile"
 			
 			while IFS="|" read -r facultyCol semesterCol codeCol nameCol typeCol creditsCol; do
-				if [[ "$faculty" == "$facultyCol" ]] && [[ "$semester" == "$semesterCol" ]] && [[ "$code" == "$codeCol" ]]; then
+				if [[ "$faculty" == "$facultyCol" ]] && [[ "$semester" == "$semesterCol" ]] && [[ "${code,,}" == "${codeCol,,}" ]]; then
 					echo "${facultyCol}|${semesterCol}|${codeCol}|${nameCol}|${newType}|${creditsCol}" >> "$tempFile"
 				else
 					echo "${facultyCol}|${semesterCol}|${codeCol}|${nameCol}|${typeCol}|${creditsCol}" >> "$tempFile"
@@ -692,7 +727,7 @@ parseParams() {
 			validateArgs "$#" 6 6
 
 			if [[ ! -f "$courseFile" ]] && ! touch "$courseFile"; then
-				die "nepodarilo sa vytvorit soubor '${courseFile}'" 1
+				die "nepodarilo se vytvorit soubor '${courseFile}'" 1
 			fi
 
 			local faculty="${args[1]}"
@@ -711,7 +746,7 @@ parseParams() {
 			fi
 			
 			if ! [[ "${code}" =~ ^[A-Za-z][A-Za-z0-9_]{0,7}$ ]]; then
-				die "kod predmetu v zlem tvaru" 1
+				die "kod predmetu ve spatnem tvaru" 1
 			fi
 
 			if grep -qi "^[^|]*|[^|]*|${code}|" "$courseFile"; then
@@ -748,7 +783,7 @@ parseParams() {
 				die "neplatne kredity" 1
 			fi
 
-			if ! grep -q "^${faculty}|${semester}|${code}" "$courseFile"; then
+			if ! grep -qi "^${faculty}|${semester}|${code}" "$courseFile"; then
 				die "predmet neexistuje" 1
 			fi
 
@@ -756,7 +791,7 @@ parseParams() {
 			touch "$tempFile"
 			
 			while IFS="|" read -r facultyCol semesterCol codeCol nameCol typeCol creditsCol; do
-				if [[ "$faculty" == "$facultyCol" ]] && [[ "$semester" == "$semesterCol" ]] && [[ "$code" == "$codeCol" ]]; then
+				if [[ "$faculty" == "$facultyCol" ]] && [[ "$semester" == "$semesterCol" ]] && [[ "${code,,}" == "${codeCol,,}" ]]; then
 					echo "${facultyCol}|${semesterCol}|${codeCol}|${nameCol}|${typeCol}|${newCredits}" >> "$tempFile"
 				else
 					echo "${facultyCol}|${semesterCol}|${codeCol}|${nameCol}|${typeCol}|${creditsCol}" >> "$tempFile"
@@ -781,7 +816,9 @@ parseParams() {
 			local code="${args[3]}"
 			local newName="${args[4]}"
 
-			if ! grep -q "^${faculty}|${semester}|${code}" "$courseFile"; then
+			# echo "$newName"
+
+			if ! grep -qi "^${faculty}|${semester}|${code}" "$courseFile"; then
 				die "predmet neexistuje" 1
 			fi
 
@@ -789,7 +826,7 @@ parseParams() {
 			touch "$tempFile"
 			
 			while IFS="|" read -r facultyCol semesterCol codeCol nameCol typeCol creditsCol; do
-				if [[ "$faculty" == "$facultyCol" ]] && [[ "$semester" == "$semesterCol" ]] && [[ "$code" == "$codeCol" ]]; then
+				if [[ "$faculty" == "$facultyCol" ]] && [[ "$semester" == "$semesterCol" ]] && [[ "${code,,}" == "${codeCol,,}" ]]; then
 					echo "${facultyCol}|${semesterCol}|${codeCol}|${newName}|${typeCol}|${creditsCol}" >> "$tempFile"
 				else
 					echo "${facultyCol}|${semesterCol}|${codeCol}|${nameCol}|${typeCol}|${creditsCol}" >> "$tempFile"
@@ -810,4 +847,3 @@ parseParams() {
 }
 
 parseParams "$@"
-
