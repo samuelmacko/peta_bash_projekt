@@ -180,7 +180,7 @@ parseParams() {
 		validateArgs "$#" 0 1
 
 		if [[ ! -f "$facultiesFile" ]] && ! touch "$facultiesFile"; then
-			die "nepodarilo sa vytvorit soubor '${facultiesFile}'" 1
+			die "nepodarilo se vytvorit soubor '${facultiesFile}'" 1
 		fi
 
 		printf "%-8s | %s\n" "Fakulta" "Název"
@@ -220,7 +220,7 @@ parseParams() {
 		validateArgs "$#" 1 1
 
 		if [[ ! -f "$facultiesFile" ]]; then
-			die "fakulty nene" 1
+			die "soubor neexistuje" 1
 		fi
 
 		local id="${args[1]}"
@@ -252,14 +252,14 @@ parseParams() {
 		validateArgs "$#" 2 2
 
 		if [[ ! -f "$facultiesFile" ]] && ! touch "$facultiesFile"; then
-			die "nepodarilo sa vytvorit soubor '${facultiesFile}'" 1
+			die "nepodarilo se vytvorit soubor '${facultiesFile}'" 1
 		fi
 
 		local id="${args[1]}"
 		local name="${args[2]}"
 		
 		if [[ ${#id} -gt 8 ]]; then
-			die "id prilis dlouhe" 1
+			die "id je prilis dlouhe" 1
 		fi
 		
 		if grep -q "^${id}|" "$facultiesFile"; then
@@ -276,7 +276,7 @@ parseParams() {
 		validateArgs "$#" 2 2
 
 		if [[ ! -f "$facultiesFile" ]]; then
-			die "fakulty nene" 1
+			die "soubor neexistuje" 1
 		fi
 
 		local id="${args[1]}"
@@ -324,7 +324,7 @@ parseParams() {
 		validateArgs "$#" 0 0
 
 		if [[ ! -d "$backupDir" ]]; then
-			die "zalohy nene" 1
+			die "adresar zaloh neexistuje" 1
 		fi
 		
 		ls "$backupDir" | sort -r
@@ -337,7 +337,7 @@ parseParams() {
 		validateArgs "$#" 0 0
 
 		if [[ ! -d "$backupDir" ]]; then
-			die "zalohy nene" 1
+			die "adresar zaloh neexistuje" 1
 		fi
 
 		local backups=($(ls "$backupDir" | sort -r))
@@ -356,7 +356,7 @@ parseParams() {
 		validateArgs "$#" 1 1
 
 		if [[ ! -d "$backupDir" ]]; then
-			die "zalohy nene" 1
+			die "adresar zaloh neexistuje" 1
 		fi
 
 		local backupFile="${args[1]}"
@@ -368,7 +368,7 @@ parseParams() {
 		rm "$dataDir"/*
 
 		if ! unzip -qo "${backupDir}/${backupFile}" -d "$dataDir"; then
-			die "chyba pri obnove" 1
+			die "chyba pri obnove zalohy" 1
 		fi
 
 		exit 0
@@ -436,7 +436,7 @@ parseParams() {
 		validateArgs "$#" 3 3
 
 		if [[ ! -f "$semestersFile" ]]; then
-			die "semestry nene" 1
+			die "soubor neexistuje" 1
 		fi
 
 		local faculty="${args[1]}"
@@ -444,14 +444,14 @@ parseParams() {
 		local start="${args[3]}"
 
 		if ! date -d "$start" "+%Y-%m-%d" >/dev/null 2>&1; then
-			die "zly format datumu" 1
+			die "spatny format datumu" 1
 		fi
 
 		local minDate="2000-01-01"
 		local maxDate=$(date -d "+2 years" "+%Y-%m-%d")
 
 		if [[ "$start" < "$minDate" ]] || [[ "$start" > "$maxDate" ]]; then
-			die "zly datum" 1
+			die "spatny datum" 1
 		fi
 
 		if ! grep -q "^${faculty}|${id}" "$semestersFile"; then
@@ -479,7 +479,7 @@ parseParams() {
 		validateArgs "$#" 3 3
 
 		if [[ ! -f "$semestersFile" ]]; then
-			die "semestry nene" 1
+			die "soubor neexistuje" 1
 		fi
 
 		local faculty="${args[1]}"
@@ -511,7 +511,7 @@ parseParams() {
 		validateArgs "$#" 0 2
 
 		if [[ ! -f "$semestersFile" ]]; then
-			die "semestry nene" 1
+			die "soubor neexistuje" 1
 		fi
 
 		local faculty="${2-}"
@@ -549,7 +549,7 @@ parseParams() {
 		validateArgs "$#" 2 2
 
 		if [[ ! -f "$semestersFile" ]]; then
-			die "semestry nene" 1
+			die "soubor neexistuje" 1
 		fi
 
 		local faculty="${args[1]}"
@@ -591,7 +591,7 @@ parseParams() {
 		local name="${args[4]}"
 		
 		if [[ ${#id} -gt 8 ]]; then
-			die "id prilis dlouhe" 1
+			die "id je prilis dlouhe" 1
 		fi
 
 		if ! date -d "$start" "+%Y-%m-%d" >/dev/null 2>&1 || ! [[ "$start" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
@@ -602,7 +602,7 @@ parseParams() {
 		local maxDate=$(date -d "+2 years" "+%Y-%m-%d")
 
 		if [[ "$start" < "$minDate" ]] || [[ "$start" > "$maxDate" ]]; then
-			die "zly datum" 1
+			die "spatny datum" 1
 		fi
 		
 		if [[ ! -f "$facultiesFile" ]] || ! grep -q "^${faculty}" "$facultiesFile"; then
@@ -623,11 +623,7 @@ parseParams() {
 		validateArgs "$#" 0 3
 
 		if [[ ! -f "$courseFile" ]]; then
-			die "predmety nene '${courseFile}'" 1
-		fi
-
-		if [[ ! -f "$courseFile" ]]; then
-			die "semestry nene" 1
+			die "soubor neexistuje" 1
 		fi
 
 		local faculty="${2-}"
@@ -668,7 +664,7 @@ parseParams() {
 		validateArgs "$#" 3 3
 
 		if [[ ! -f "$courseFile" ]]; then
-			die "predmety nene" 1
+			die "soubor neexistuje" 1
 		fi
 
 		local faculty="${args[1]}"
@@ -698,7 +694,7 @@ parseParams() {
 		validateArgs "$#" 4 4
 
 		if [[ ! -f "$courseFile" ]]; then
-			die "predmety nene" 1
+			die "soubor neexistuje" 1
 		fi
 
 		local faculty="${args[1]}"
@@ -779,7 +775,7 @@ parseParams() {
 		validateArgs "$#" 4 4
 
 		if [[ ! -f "$courseFile" ]]; then
-			die "predmety nene" 1
+			die "soubor neexistuje" 1
 		fi
 
 		local faculty="${args[1]}"
@@ -816,7 +812,7 @@ parseParams() {
 		validateArgs "$#" 4 4
 
 		if [[ ! -f "$courseFile" ]]; then
-			die "predmety nene" 1
+			die "soubor neexistuje" 1
 		fi
 
 		local faculty="${args[1]}"
