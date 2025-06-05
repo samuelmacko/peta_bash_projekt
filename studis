@@ -6,8 +6,7 @@ dataDir="${scriptDir}/data"
 backupDir="${scriptDir}/backup"
 force=false
 
-# order=("log" "fak" "sem" "pre" "stu" "zap" "zna")
-order=("log" "fak")
+order=("log" "fak" "sem" "pre")
 
 pomoc() {
 	cat << EOF
@@ -28,11 +27,11 @@ validateArgs() {
 
 	if [[ "$argsNum" -lt "$min" ]]; then
 		die "nedostatek parametru" 1
-    fi
+	fi
 
-    if [[ "$argsNum" -gt "$max" ]]; then
+	if [[ "$argsNum" -gt "$max" ]]; then
 		die "nadbytecne parametry" 1
-    fi
+	fi
 }
 
 parseParams() {
@@ -43,21 +42,24 @@ parseParams() {
 		case "${1-}" in
 		-f )
 			force=true
-			# shift
 			;;
 		-d )
 			local path="${2-}"
+
 			if [[ "$path" != /* ]]; then
 				path="$(pwd)/$path"
 			fi
+
 			dataDir="${path%/}"
 			shift
 			;;
 		-b )
 			local path="${2-}"
+
 			if [[ "$path" != /* ]]; then
 				path="$(pwd)/$path"
 			fi
+
 			backupDir="${path%/}"
 			shift
 			;;
@@ -82,6 +84,18 @@ parseParams() {
 	local facultiesFile="${dataDir}/fak"
 	local semestersFile="${dataDir}/sem"
 	local courseFile="${dataDir}/pre"
+	
+	if ! touch "$facultiesFile"; then
+		die "nepodarilo se vytvorit soubor '${facultiesFile}'" 1
+	fi
+	
+	if ! touch "$semestersFile"; then
+		die "nepodarilo se vytvorit soubor '${semestersFile}'" 1
+	fi
+	
+	if ! touch "$courseFile"; then
+		die "nepodarilo se vytvorit soubor '${courseFile}'" 1
+	fi
 
 	local logMessage="$(date "+%Y-%m-%d %H:%M.%S") $$ ${LOGNAME:-x} $0 $inputParams"
 	echo "$logMessage" >> $logsFile
@@ -92,756 +106,748 @@ parseParams() {
 	case "$command" in
         "pomoc")
 
-            pomoc
-            exit 0
-            ;;
+		pomoc
+		exit 0
+		;;
             
         "cesta-adresář" | "cesta-adresar")
 
-			validateArgs "$#" 0 0
+		validateArgs "$#" 0 0
 
-            echo "$dataDir"
-            exit 0
-            ;;
+		echo "$dataDir"
+		exit 0
+		;;
             
         "smaž-adresář" | "smaz-adresar")
 
-			validateArgs "$#" 0 0
+		validateArgs "$#" 0 0
 
-            if [[ "$force" != true ]]; then
-                die "neni -f" 1
-            fi
+		if [[ "$force" != true ]]; then
+			die "neni -f" 1
+		fi
 
-	    # echo "$dataDir"
+		rm -rf "$dataDir"
 
-            rm -rf "$dataDir"
-            exit 0
-            ;;
+		exit 0
+		;;
             
         "log-výběr" | "log-vyber")
 
-			validateArgs "$#" 0 1
+		validateArgs "$#" 0 1
 
-			local regex="${2}"
+		local regex="${2}"
 
-            if [[ ! -z "$regex" ]]; then
+		if [[ ! -z "$regex" ]]; then
 
-                if ! grep -qE "$regex" "$logsFile"; then
-                    die "" 1
-                fi
+			if ! grep -qE "$regex" "$logsFile"; then
+			    die "" 1
+			fi
 
-                grep -E "$regex" "$logsFile"
+			grep -E "$regex" "$logsFile"
 				
-            else
-                cat "$logsFile"
-            fi
+		else
+			cat "$logsFile"
+		fi
 
-            exit 0
-            ;;
+		exit 0
+		;;
             
         "log-poslední" | "log-posledni")
 
-			validateArgs "$#" 0 1
+		validateArgs "$#" 0 1
 
-			local count="${2-10}"
+		local count="${2-10}"
 
-            if [[ "$#" -eq 2 ]]; then
+		if [[ "$#" -eq 2 ]]; then
 
-                if [[ ! "$count" =~ ^[0-9]+$ ]]; then
-                    die "musi byt cislo" 1
-                fi
-
-            fi
-            
-            if [[ "$#" -eq 1 ]]; then
-                tail -n "$count" "$logsFile" | nl -ba | sort -n
-            else
-                tail -n "$count" "$logsFile"
-            fi
-
-            exit 0
-            ;;
-
-		"fakulta-výpis" | "fakulta-vypis")
-
-			validateArgs "$#" 0 1
-
-			if [[ ! -f "$facultiesFile" ]]; then
-				die "fakulty nene" 1
+			if [[ ! "$count" =~ ^[0-9]+$ ]]; then
+			    die "musi byt cislo" 1
 			fi
 
-			printf "%-8s | %s\n" "Fakulta" "Název"
-			printf "%s\n" "--------------------------"
+		fi
 
-			local id="${2-}"
+		if [[ "$#" -eq 1 ]]; then
+			tail -n "$count" "$logsFile" | nl -ba | sort -n
+		else
+			tail -n "$count" "$logsFile"
+		fi
 
-            if [[ ! -z "$id" ]]; then
+		exit 0
+		;;
 
-				local name=$(grep -w "^$id" "$facultiesFile" | cut -d '|' -f 2)
+	"fakulta-výpis" | "fakulta-vypis")
 
-				if [[ -z "$name" ]]; then
-					die "fakulta neexistuje" 1
-				else
-					while IFS="|" read -r idCol nameCol; do
-					    if [[ "$name" == "$nameCol" ]]; then
-					        printf "%-8s | %s\n" "$idCol" "$nameCol"
-					    fi
-					done < "$facultiesFile"
-				
-					exit 0
-				fi
+		validateArgs "$#" 0 1
 
-			else
+		if [[ ! -f "$facultiesFile" ]] && ! touch "$facultiesFile"; then
+			die "nepodarilo sa vytvorit soubor '${facultiesFile}'" 1
+		fi
 
-				while IFS="|" read -r idCol nameCol; do
-					printf "%-8s | %s\n" "$idCol" "$nameCol"
-				done < <(sort "$facultiesFile")
+		printf "%-8s | %s\n" "Fakulta" "Název"
+		printf "%s\n" "--------------------------"
 
-			fi
+		local id="${2-}"
 
-			exit 0
-			;;
+		if [[ ! -z "$id" ]]; then
 
-		"fakulta-smaž" | "fakulta-smaz")
+			local name=$(grep -w "^$id" "$facultiesFile" | cut -d '|' -f 2)
 
-			validateArgs "$#" 1 1
-
-			if [[ ! -f "$facultiesFile" ]]; then
-				die "fakulty nene" 1
-			fi
-
-			local id="${args[1]}"
-
-			if ! grep -q "^${id}|" "$facultiesFile"; then
+			if [[ -z "$name" ]]; then
 				die "fakulta neexistuje" 1
+			else
+				while IFS="|" read -r idCol nameCol; do
+				    if [[ "$name" == "$nameCol" ]]; then
+					printf "%-8s | %s\n" "$idCol" "$nameCol"
+				    fi
+				done < "$facultiesFile"
+			
+				exit 0
 			fi
 
-			if [[ -f "$semestersFile" ]] && grep -q "^${id}|" "$semestersFile"; then
-				die "na fakulte je semestr" 1
+		else
+
+			while IFS="|" read -r idCol nameCol; do
+				printf "%-8s | %s\n" "$idCol" "$nameCol"
+			done < <(sort "$facultiesFile")
+
+		fi
+
+		exit 0
+		;;
+
+	"fakulta-smaž" | "fakulta-smaz")
+
+		validateArgs "$#" 1 1
+
+		if [[ ! -f "$facultiesFile" ]]; then
+			die "fakulty nene" 1
+		fi
+
+		local id="${args[1]}"
+
+		if ! grep -q "^${id}|" "$facultiesFile"; then
+			die "fakulta neexistuje" 1
+		fi
+
+		if [[ -f "$semestersFile" ]] && grep -q "^${id}|" "$semestersFile"; then
+			die "na fakulte je semestr" 1
+		fi
+
+		local tempFile="${dataDir}/tmp"
+		touch "$tempFile"
+
+		while IFS='|' read -r idCol nameCol; do
+			if [[ "$id" != "$idCol" ]]; then
+				echo "${idCol}|${nameCol}" >> "$tempFile"
 			fi
+		done < "$facultiesFile"
 
-			local tempFile="${dataDir}/tmp"
-			touch "$tempFile"
+		mv "$tempFile" "$facultiesFile"
 
-			while IFS='|' read -r idCol nameCol; do
-				if [[ "$id" != "$idCol" ]]; then
-					echo "${idCol}|${nameCol}" >> "$tempFile"
-				fi
-			done < "$facultiesFile"
-
-			mv "$tempFile" "$facultiesFile"
-
-			exit 0
-			;;
+		exit 0
+		;;
 
         "fakulta-nová" | "fakulta-nova")
 
-			validateArgs "$#" 2 2
+		validateArgs "$#" 2 2
 
-			if [[ ! -f "$facultiesFile" ]] && ! touch "$facultiesFile"; then
-				die "nepodarilo sa vytvorit soubor '${facultiesFile}'" 1
-			fi
+		if [[ ! -f "$facultiesFile" ]] && ! touch "$facultiesFile"; then
+			die "nepodarilo sa vytvorit soubor '${facultiesFile}'" 1
+		fi
 
-			local id="${args[1]}"
-			local name="${args[2]}"
-			
-			if [[ ${#id} -gt 8 ]]; then
-				die "id prilis dlouhe" 1
-			fi
-			
-			if grep -q "^${id}|" "$facultiesFile"; then
-				die "fakulta jiz existuje" 1
-			fi
-			
-			echo "${id}|${name}" >> "$facultiesFile"
+		local id="${args[1]}"
+		local name="${args[2]}"
+		
+		if [[ ${#id} -gt 8 ]]; then
+			die "id prilis dlouhe" 1
+		fi
+		
+		if grep -q "^${id}|" "$facultiesFile"; then
+			die "fakulta jiz existuje" 1
+		fi
+		
+		echo "${id}|${name}" >> "$facultiesFile"
 
-			exit 0
-			;;
+		exit 0
+		;;
 
         "fakulta-název" | "fakulta-nazev")
 
-			validateArgs "$#" 2 2
+		validateArgs "$#" 2 2
 
-			if [[ ! -f "$facultiesFile" ]]; then
-				die "fakulty nene" 1
+		if [[ ! -f "$facultiesFile" ]]; then
+			die "fakulty nene" 1
+		fi
+
+		local id="${args[1]}"
+		local name="${args[2]}"
+
+		if ! grep -q "^${id}|" "$facultiesFile"; then
+			die "fakulta neexistuje" 1
+		fi
+
+		local tempFile="${dataDir}/tmp"
+		touch "$tempFile"
+
+		while IFS='|' read -r idCol nameCol; do
+			if [[ "$id" == "$idCol" ]]; then
+				echo "${id}|${name}" >> "$tempFile"
+			else
+				echo "${idCol}|${nameCol}" >> "$tempFile"
 			fi
+		done < "$facultiesFile"
 
-			local id="${args[1]}"
-			local name="${args[2]}"
+		mv "$tempFile" "$facultiesFile"
 
-			if ! grep -q "^${id}|" "$facultiesFile"; then
-				die "fakulta neexistuje" 1
-			fi
+		exit 0
+		;;
 
-			# if grep -q "^${id}|" "$semestersFile"; then
-			#	die "na fakulte je semestr" 1
-			# fi
+	"záloha" | "zaloha")
 
-			local tempFile="${dataDir}/tmp"
-			touch "$tempFile"
+		validateArgs "$#" 0 0
 
-			while IFS='|' read -r idCol nameCol; do
-				if [[ "$id" == "$idCol" ]]; then
-					echo "${id}|${name}" >> "$tempFile"
-				else
-					echo "${idCol}|${nameCol}" >> "$tempFile"
-				fi
-			done < "$facultiesFile"
+		if [[ ! -d "$backupDir" ]] && ! mkdir -p "$backupDir"; then
+			die "nepodarilo se vytvorit adresar '${backupDir}'" 1
+		fi
 
-			mv "$tempFile" "$facultiesFile"
+		local backupFile="${backupDir}/$(date '+%Y-%m-%d_%H-%M-%S').zip"
 
-			exit 0
-			;;
+		if ! (cd "$dataDir" && zip -rq "$backupFile" ./*); then
+			die "nepodarilo se vytvorit zalohu" 1
+		fi
 
-		"záloha" | "zaloha")
+		exit 0
+		;;
 
-			validateArgs "$#" 0 0
+	"zálohy" | "zalohy")
 
-			if [[ ! -d "$backupDir" ]] && ! mkdir -p "$backupDir"; then
-				die "nepodarilo se vytvorit adresar '${backupDir}'" 1
-			fi
+		validateArgs "$#" 0 0
 
-			local backupFile="${backupDir}/$(date '+%Y-%m-%d_%H-%M-%S').tar.gz"
-    
-			if ! (cd "$dataDir" && zip -rq "$backupFile" ./*); then
-				die "nepodarilo se vytvorit zalohu" 1
-			fi
+		if [[ ! -d "$backupDir" ]]; then
+			die "zalohy nene" 1
+		fi
+		
+		ls "$backupDir" | sort -r
 
-			exit 0
-			;;
+		exit 0
+		;;
+		
+	"zálohy-smaž" | "zalohy-smaz")
 
-		"zálohy" | "zalohy")
+		validateArgs "$#" 0 0
 
-			validateArgs "$#" 0 0
+		if [[ ! -d "$backupDir" ]]; then
+			die "zalohy nene" 1
+		fi
 
-			if [[ ! -d "$backupDir" ]]; then
-				die "zalohy nene" 1
-			fi
-			
-			ls "$backupDir" | sort -r
-
-			exit 0
-			;;
-			
-		"zálohy-smaž" | "zalohy-smaz")
-
-			validateArgs "$#" 0 0
-
-			if [[ ! -d "$backupDir" ]]; then
-				die "zalohy nene" 1
-			fi
-
-			local backups=($(ls "$backupDir" | sort -r))
-			
-			if [[ "${#backups[@]}" -gt 2 ]]; then
-				for backup in "${backups[@]:2}"; do
-					rm "${backupDir}/${backup}"
-				done
-			fi
-
-			exit 0
-			;;
-
-		"obnova")
-
-			validateArgs "$#" 1 1
-
-			if [[ ! -d "$backupDir" ]]; then
-				die "zalohy nene" 1
-			fi
-
-			local backupFile="${args[1]}"
-
-			if [[ ! -f "${backupDir}/${backupFile}" ]]; then
-				die "zadana zaloha neexistuje" 1
-			fi
-
-			if ! unzip -qo "${backupDir}/${backupFile}" -d "$dataDir"; then
-				die "chyba pri obnove" 1
-			fi
-
-			exit 0
-			;;
-
-		"data-md5")
-
-			validateArgs "$#" 0 0
-
-			for fileName in "${order[@]}"; do
-
-				local filePath="${dataDir}/${fileName}" 
-
-				if [[ -f "$filePath" ]]; then
-					printf "%s %s\n" "$fileName" $(md5sum "$filePath" | cut -d ' ' -f1)
-				else
-					printf "%s %s\n" "$fileName" "d41d8cd98f00b204e9800998ecf8427e"
-				fi
-
+		local backups=($(ls "$backupDir" | sort -r))
+		
+		if [[ "${#backups[@]}" -gt 2 ]]; then
+			for backup in "${backups[@]:2}"; do
+				rm "${backupDir}/${backup}"
 			done
+		fi
 
-			exit 0
-			;;
+		exit 0
+		;;
 
-		"data-velikost")
+	"obnova")
 
-			validateArgs "$#" 0 0
+		validateArgs "$#" 1 1
 
-			for fileName in "${order[@]}"; do
+		if [[ ! -d "$backupDir" ]]; then
+			die "zalohy nene" 1
+		fi
 
-				local filePath="${dataDir}/${fileName}" 
+		local backupFile="${args[1]}"
 
-				if [[ -f "$filePath" ]]; then
+		if [[ ! -f "${backupDir}/${backupFile}" ]]; then
+			die "zadana zaloha neexistuje" 1
+		fi
 
-					printf "%s %s\n" "$fileName" $(stat -c%s "$filePath")
-				else
-					printf "%s %s\n" "$fileName" "0"
-				fi
+		rm "$dataDir"/*
 
-			done
+		if ! unzip -qo "${backupDir}/${backupFile}" -d "$dataDir"; then
+			die "chyba pri obnove" 1
+		fi
 
-			exit 0
-			;;
+		exit 0
+		;;
 
-		"data-čas" | "data-cas")
+	"data-md5")
 
-			validateArgs "$#" 0 0
+		validateArgs "$#" 0 0
 
-			for fileName in "${order[@]}"; do
+		for fileName in "${order[@]}"; do
 
-				local filePath="${dataDir}/${fileName}" 
+			local filePath="${dataDir}/${fileName}" 
 
-				if [[ -f "$filePath" ]]; then
-					printf "%s %s %s\n" "$fileName" $(stat -c%y "$filePath" | cut -d'.' -f1)
-					# printf "%s %s %s\n" "$fileName" $(ls --full-time "$filePath" | tr -s ' ' | cut -d' ' -f6,7 | cut -d'.' -f1)
-					# printf "%s %s\n" "$fileName" $(ls --full-time "$filePath")
-				else
-					printf "%s %s %s\n" "$fileName" "0000-00-00 00:00:00"
-				fi
-
-			done
-
-			exit 0
-			;;
-
-		"semestr-datum")
-
-			validateArgs "$#" 3 3
-
-			if [[ ! -f "$semestersFile" ]]; then
-				die "semestry nene" 1
+			if [[ -f "$filePath" ]]; then
+				printf "%s %s\n" "$fileName" $(md5sum "$filePath" | cut -d ' ' -f1)
+			else
+				printf "%s %s\n" "$fileName" "d41d8cd98f00b204e9800998ecf8427e"
 			fi
 
-			local faculty="${args[1]}"
-			local id="${args[2]}"
-			local start="${args[3]}"
+		done
 
-			if ! date -d "$start" "+%Y-%m-%d" >/dev/null 2>&1; then
-				die "zly format datumu" 1
+		exit 0
+		;;
+
+	"data-velikost")
+
+		validateArgs "$#" 0 0
+
+		for fileName in "${order[@]}"; do
+
+			local filePath="${dataDir}/${fileName}" 
+
+			if [[ -f "$filePath" ]]; then
+				printf "%s %s\n" "$fileName" $(stat -c%s "$filePath")
+			else
+				printf "%s %s\n" "$fileName" "0"
 			fi
 
-			local minDate="2000-01-01"
-			local maxDate=$(date -d "+2 years" "+%Y-%m-%d")
+		done
 
-			if [[ "$start" < "$minDate" ]] || [[ "$start" > "$maxDate" ]]; then
-				die "zly datum" 1
+		exit 0
+		;;
+
+	"data-čas" | "data-cas")
+
+		validateArgs "$#" 0 0
+
+		for fileName in "${order[@]}"; do
+
+			local filePath="${dataDir}/${fileName}" 
+
+			if [[ -f "$filePath" ]]; then
+				printf "%s %s %s\n" "$fileName" $(stat -c%y "$filePath" | cut -d'.' -f1)
+			else
+				printf "%s %s %s\n" "$fileName" "0000-00-00 00:00:00"
 			fi
 
-			if ! grep -q "^${faculty}|${id}" "$semestersFile"; then
-				die "semestr neexistuje" 1
+		done
+
+		exit 0
+		;;
+
+	"semestr-datum")
+
+		validateArgs "$#" 3 3
+
+		if [[ ! -f "$semestersFile" ]]; then
+			die "semestry nene" 1
+		fi
+
+		local faculty="${args[1]}"
+		local id="${args[2]}"
+		local start="${args[3]}"
+
+		if ! date -d "$start" "+%Y-%m-%d" >/dev/null 2>&1; then
+			die "zly format datumu" 1
+		fi
+
+		local minDate="2000-01-01"
+		local maxDate=$(date -d "+2 years" "+%Y-%m-%d")
+
+		if [[ "$start" < "$minDate" ]] || [[ "$start" > "$maxDate" ]]; then
+			die "zly datum" 1
+		fi
+
+		if ! grep -q "^${faculty}|${id}" "$semestersFile"; then
+			die "semestr neexistuje" 1
+		fi
+
+		local tempFile="${dataDir}/tmp"
+		touch "$tempFile"
+		
+		while IFS="|" read -r facultyCol idCol startCol nameCol; do
+			if [[ "$faculty" == "$facultyCol" ]] && [[ "$id" == "$idCol" ]]; then
+				echo "${facultyCol}|${idCol}|${start}|${nameCol}" >> "$tempFile"
+			else
+				echo "${facultyCol}|${idCol}|${startCol}|${nameCol}" >> "$tempFile"
 			fi
+		done < "$semestersFile"
 
-			local tempFile="${dataDir}/tmp"
-			touch "$tempFile"
-			
-			while IFS="|" read -r facultyCol idCol startCol nameCol; do
-				if [[ "$faculty" == "$facultyCol" ]] && [[ "$id" == "$idCol" ]]; then
-					echo "${facultyCol}|${idCol}|${start}|${nameCol}" >> "$tempFile"
-				else
-					echo "${facultyCol}|${idCol}|${startCol}|${nameCol}" >> "$tempFile"
-				fi
-			done < "$semestersFile"
+		mv "$tempFile" "$semestersFile"
 
-			mv "$tempFile" "$semestersFile"
+		exit 0
+		;;
 
-			exit 0
-			;;
+	"semestr-název" | "semestr-nazev")
 
-		"semestr-název" | "semestr-nazev")
+		validateArgs "$#" 3 3
 
-			validateArgs "$#" 3 3
+		if [[ ! -f "$semestersFile" ]]; then
+			die "semestry nene" 1
+		fi
 
-			if [[ ! -f "$semestersFile" ]]; then
-				die "semestry nene" 1
+		local faculty="${args[1]}"
+		local id="${args[2]}"
+		local name="${args[3]}"
+
+		if ! grep -q "^${faculty}|${id}" "$semestersFile"; then
+			die "semestr neexistuje" 1
+		fi
+
+		local tempFile="${dataDir}/tmp"
+		touch "$tempFile"
+		
+		while IFS="|" read -r facultyCol idCol startCol nameCol; do
+			if [[ "$faculty" == "$facultyCol" ]] && [[ "$id" == "$idCol" ]]; then
+				echo "${facultyCol}|${idCol}|${startCol}|${name}" >> "$tempFile"
+			else
+				echo "${facultyCol}|${idCol}|${startCol}|${nameCol}" >> "$tempFile"
 			fi
+		done < "$semestersFile"
 
-			local faculty="${args[1]}"
-			local id="${args[2]}"
-			local name="${args[3]}"
+		mv "$tempFile" "$semestersFile"
 
-			if ! grep -q "^${faculty}|${id}" "$semestersFile"; then
-				die "semestr neexistuje" 1
+		exit 0
+		;;
+
+	"semestr-výpis" | "semestr-vypis")
+
+		validateArgs "$#" 0 2
+
+		if [[ ! -f "$semestersFile" ]]; then
+			die "semestry nene" 1
+		fi
+
+		local faculty="${2-}"
+		local semester="${3-}"
+
+		local found=false
+
+		while IFS="|" read -r facultyCol idCol startCol nameCol; do
+
+			if [[ ! -z "$semester" ]] && [[ "$semester" != "$idCol" ]]; then
+				continue
+			elif [[ ! -z "$faculty" ]] && [[ "$faculty" != "$facultyCol" ]]; then
+				continue
 			fi
-
-			local tempFile="${dataDir}/tmp"
-			touch "$tempFile"
-			
-			while IFS="|" read -r facultyCol idCol startCol nameCol; do
-				if [[ "$faculty" == "$facultyCol" ]] && [[ "$id" == "$idCol" ]]; then
-					echo "${facultyCol}|${idCol}|${startCol}|${name}" >> "$tempFile"
-				else
-					echo "${facultyCol}|${idCol}|${startCol}|${nameCol}" >> "$tempFile"
-				fi
-			done < "$semestersFile"
-
-			mv "$tempFile" "$semestersFile"
-
-			exit 0
-			;;
-
-		"semestr-výpis" | "semestr-vypis")
-
-			validateArgs "$#" 0 2
-
-			if [[ ! -f "$semestersFile" ]]; then
-				die "semestry nene" 1
-			fi
-
-			local faculty="${2-}"
-			local semester="${3-}"
-
-			local found=false
-
-			while IFS="|" read -r facultyCol idCol startCol nameCol; do
-
-				if [[ ! -z "$semester" ]] && [[ "$semester" != "$idCol" ]]; then
-					continue
-				elif [[ ! -z "$faculty" ]] && [[ "$faculty" != "$facultyCol" ]]; then
-					continue
-				fi
-
-				if [[ "$found" == false ]]; then
-					printf "%-8s | %-8s | %-10s | %s\n" "Fakulta" "Semestr" "Od" "Název"
-					printf "%s\n" "-----------------------------------------"
-					found=true
-				fi
-
-				printf "%-8s | %-8s | %-10s | %s\n" "$facultyCol" "$idCol" "$startCol" "$nameCol"
-
-			done < <(sort -t "|" -k3,3 -k1,1 "$semestersFile")
 
 			if [[ "$found" == false ]]; then
-				die "nic se nenaslo" 1
+				printf "%-8s | %-8s | %-10s | %s\n" "Fakulta" "Semestr" "Od" "Název"
+				printf "%s\n" "-----------------------------------------"
+				found=true
 			fi
 
-			exit 0
-			;;
+			printf "%-8s | %-8s | %-10s | %s\n" "$facultyCol" "$idCol" "$startCol" "$nameCol"
 
-		"semestr-smaž" | "semestr-smaz")
+		done < <(sort -t "|" -k3,3 -k1,1 "$semestersFile")
 
-			validateArgs "$#" 2 2
+		if [[ "$found" == false ]]; then
+			die "nic se nenaslo" 1
+		fi
 
-			if [[ ! -f "$semestersFile" ]]; then
-				die "semestry nene" 1
+		exit 0
+		;;
+
+	"semestr-smaž" | "semestr-smaz")
+
+		validateArgs "$#" 2 2
+
+		if [[ ! -f "$semestersFile" ]]; then
+			die "semestry nene" 1
+		fi
+
+		local faculty="${args[1]}"
+		local id="${args[2]}"
+
+		if ! grep -q "^${faculty}|${id}" "$semestersFile"; then
+			die "semestr neexistuje" 1
+		fi
+
+		if grep -q "^${faculty}|${id}|" "$courseFile"; then
+			die "semestr ma predmet" 1
+		fi
+
+		local tempFile="${dataDir}/tmp"
+		touch "$tempFile"
+		
+		while IFS="|" read -r facultyCol idCol startCol nameCol; do
+			if [[ "$faculty" != "$facultyCol" ]] || [[ "$id" != "$idCol" ]]; then
+				echo "${facultyCol}|${idCol}|${startCol}|${nameCol}" >> "$tempFile"
 			fi
+		done < "$semestersFile"
 
-			local faculty="${args[1]}"
-			local id="${args[2]}"
+		mv "$tempFile" "$semestersFile"
 
-			if ! grep -q "^${faculty}|${id}" "$semestersFile"; then
-				die "semestr neexistuje" 1
-			fi
+		exit 0
+		;;
 
-			if grep -q "^${faculty}|${id}|" "$courseFile"; then
-				die "semestr ma predmet" 1
-			fi
+	"semestr-nový" | "semestr-novy")
 
-			local tempFile="${dataDir}/tmp"
-			touch "$tempFile"
-			
-			while IFS="|" read -r facultyCol idCol startCol nameCol; do
-				if [[ "$faculty" != "$facultyCol" ]] || [[ "$id" != "$idCol" ]]; then
-					echo "${facultyCol}|${idCol}|${startCol}|${nameCol}" >> "$tempFile"
-				fi
-			done < "$semestersFile"
+		validateArgs "$#" 4 4
 
-			mv "$tempFile" "$semestersFile"
+		if [[ ! -f "$semestersFile" ]] && ! touch "$semestersFile"; then
+			die "nepodarilo se vytvorit soubor '${semestersFile}'" 1
+		fi
 
-			exit 0
-			;;
+		local faculty="${args[1]}"
+		local id="${args[2]}"
+		local start="${args[3]}"
+		local name="${args[4]}"
+		
+		if [[ ${#id} -gt 8 ]]; then
+			die "id prilis dlouhe" 1
+		fi
 
-		"semestr-nový" | "semestr-novy")
+		if ! date -d "$start" "+%Y-%m-%d" >/dev/null 2>&1 || ! [[ "$start" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+			die "spatny format datumu" 1
+		fi
 
-			validateArgs "$#" 4 4
+		local minDate="2000-01-01"
+		local maxDate=$(date -d "+2 years" "+%Y-%m-%d")
 
-			if [[ ! -f "$semestersFile" ]] && ! touch "$semestersFile"; then
-				die "nepodarilo se vytvorit soubor '${semestersFile}'" 1
-			fi
+		if [[ "$start" < "$minDate" ]] || [[ "$start" > "$maxDate" ]]; then
+			die "zly datum" 1
+		fi
+		
+		if [[ ! -f "$facultiesFile" ]] || ! grep -q "^${faculty}" "$facultiesFile"; then
+			die "fakulta neexistuje" 1
+		fi
 
-			local faculty="${args[1]}"
-			local id="${args[2]}"
-			local start="${args[3]}"
-			local name="${args[4]}"
-			
-			if [[ ${#id} -gt 8 ]]; then
-				die "id prilis dlouhe" 1
-			fi
+		if grep -q "^${faculty}|${id}" "$semestersFile"; then
+			die "semestr jiz existuje" 1
+		fi
 
-			if ! date -d "$start" "+%Y-%m-%d" >/dev/null 2>&1 || ! [[ "$start" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
-				die "spatny format datumu" 1
-			fi
+		echo "${faculty}|${id}|${start}|${name}" >> "$semestersFile"
 
-			local minDate="2000-01-01"
-			local maxDate=$(date -d "+2 years" "+%Y-%m-%d")
+		exit 0
+		;;
 
-			if [[ "$start" < "$minDate" ]] || [[ "$start" > "$maxDate" ]]; then
-				die "zly datum" 1
-			fi
-			
-			if [[ ! -f "$facultiesFile" ]] || ! grep -q "^${faculty}" "$facultiesFile"; then
-				die "fakulta neexistuje" 1
-			fi
+	"předmět-výpis" | "predmet-vypis")
 
-			if grep -q "^${faculty}|${id}" "$semestersFile"; then
-				die "semestr jiz existuje" 1
-			fi
+		validateArgs "$#" 0 3
 
-			echo "${faculty}|${id}|${start}|${name}" >> "$semestersFile"
+		if [[ ! -f "$courseFile" ]]; then
+			die "predmety nene '${courseFile}'" 1
+		fi
 
-			exit 0
-			;;
+		if [[ ! -f "$courseFile" ]]; then
+			die "semestry nene" 1
+		fi
 
-		"předmět-výpis" | "predmet-vypis")
+		local faculty="${2-}"
+		local semester="${3-}"
+		local code="${4-}"
 
-			validateArgs "$#" 0 3
+		local found=false
 
-			if [[ ! -f "$courseFile" ]]; then
-				die "predmety nene '${courseFile}'" 1
-			fi
+		while IFS="|" read -r facultyCol semesterCol codeCol nameCol typeCol creditsCol; do
 
-			if [[ ! -f "$courseFile" ]]; then
-				die "semestry nene" 1
-			fi
-
-			local faculty="${2-}"
-			local semester="${3-}"
-			local code="${4-}"
-
-			local found=false
-
-			while IFS="|" read -r facultyCol semesterCol codeCol nameCol typeCol creditsCol; do
-
-				if [[ ! -z "$code" ]] && [[ "${code,,}" != "${codeCol,,}" ]]; then
-					continue
-				elif [[ ! -z "$semester" ]] && [[ "$semester" != "$semesterCol" ]]; then
-					continue
-				elif [[ ! -z "$faculty" ]] && [[ "$faculty" != "$facultyCol" ]]; then
-					continue
-				fi
-				
-				if [[ "$found" == false ]]; then
-					printf "%-8s | %-8s | %-8s | %-2s | %2s | %s\n" "Fakulta" "Semestr" "Kurz" "Uk" "Kr" "Název"
-					printf "%s\n" "----------------------------------------------------"
-					found=true
-				fi
-
-				printf "%-8s | %-8s | %-8s | %-2s | %2s | %s\n" "$facultyCol" "$semesterCol" "$codeCol" "$typeCol" "$creditsCol" "$nameCol"
-
-			done < <(sort -t "|" -k1,1 -k2,2 -k3,3 "$courseFile")
-
-			if [[ "$found" != true ]]; then
-				die "nic se nenaslo" 1
-			fi
-
-			exit 0
-			;;
-
-		"předmět-smaž" | "predmet-smaz")
-
-			validateArgs "$#" 3 3
-
-			if [[ ! -f "$courseFile" ]]; then
-				die "predmety nene" 1
-			fi
-
-			local faculty="${args[1]}"
-			local semester="${args[2]}"
-			local code="${args[3]}"
-
-			if ! grep -qi "^${faculty}|${semester}|${code}" "$courseFile"; then
-				die "predmet neexistuje" 1
-			fi
-
-			local tempFile="${dataDir}/tmp"
-			touch "$tempFile"
-			
-			while IFS="|" read -r facultyCol semesterCol codeCol nameCol typeCol creditsCol; do
-				if [[ "$faculty" != "$facultyCol" ]] || [[ "$semester" != "$semesterCol" ]] || [[ "${code,,}" != "${codeCol,,}" ]]; then
-					echo "${facultyCol}|${semesterCol}|${codeCol}|${nameCol}|${typeCol}|${creditsCol}" >> "$tempFile"
-				fi
-			done < "$courseFile"
-
-			mv "$tempFile" "$courseFile"
-
-			exit 0
-			;;
-
-		"předmět-ukončení" | "predmet-ukonceni")
-
-			validateArgs "$#" 4 4
-
-			if [[ ! -f "$courseFile" ]]; then
-				die "predmety nene" 1
-			fi
-
-			local faculty="${args[1]}"
-			local semester="${args[2]}"
-			local code="${args[3]}"
-			local newType="${args[4]}"
-
-			if ! [[ "${newType}" =~ ^(zk|k|z)$ ]]; then
-				die "neplatne zakonceni" 1
-			fi
-
-			if ! grep -qi "^${faculty}|${semester}|${code}" "$courseFile"; then
-				die "predmet neexistuje" 1
-			fi
-
-			local tempFile="${dataDir}/tmp"
-			touch "$tempFile"
-			
-			while IFS="|" read -r facultyCol semesterCol codeCol nameCol typeCol creditsCol; do
-				if [[ "$faculty" == "$facultyCol" ]] && [[ "$semester" == "$semesterCol" ]] && [[ "${code,,}" == "${codeCol,,}" ]]; then
-					echo "${facultyCol}|${semesterCol}|${codeCol}|${nameCol}|${newType}|${creditsCol}" >> "$tempFile"
-				else
-					echo "${facultyCol}|${semesterCol}|${codeCol}|${nameCol}|${typeCol}|${creditsCol}" >> "$tempFile"
-				fi
-			done < "$courseFile"
-
-			mv "$tempFile" "$courseFile"
-
-			exit 0
-			;;
-
-		"předmět-nový" | "predmet-novy")
-
-			validateArgs "$#" 6 6
-
-			if [[ ! -f "$courseFile" ]] && ! touch "$courseFile"; then
-				die "nepodarilo se vytvorit soubor '${courseFile}'" 1
-			fi
-
-			local faculty="${args[1]}"
-			local semester="${args[2]}"
-			local code="${args[3]}"
-			local name="${args[4]}"
-			local type="${args[5]}"
-			local credits="${args[6]}"
-			
-			if [[ ! -f "$facultiesFile" ]] || ! grep -q "^${faculty}" "$facultiesFile"; then
-				die "fakulta neexistuje" 1
+			if [[ ! -z "$code" ]] && [[ "${code,,}" != "${codeCol,,}" ]]; then
+				continue
+			elif [[ ! -z "$semester" ]] && [[ "$semester" != "$semesterCol" ]]; then
+				continue
+			elif [[ ! -z "$faculty" ]] && [[ "$faculty" != "$facultyCol" ]]; then
+				continue
 			fi
 			
-			if [[ ! -f "$semestersFile" ]] || ! grep -q "^${faculty}|${id}" "$facultiesFile"; then
-				die "fakulta neexistuje" 1
-			fi
-			
-			if ! [[ "${code}" =~ ^[A-Za-z][A-Za-z0-9_]{0,7}$ ]]; then
-				die "kod predmetu ve spatnem tvaru" 1
+			if [[ "$found" == false ]]; then
+				printf "%-8s | %-8s | %-8s | %-2s | %2s | %s\n" "Fakulta" "Semestr" "Kurz" "Uk" "Kr" "Název"
+				printf "%s\n" "----------------------------------------------------"
+				found=true
 			fi
 
-			if grep -qi "^[^|]*|[^|]*|${code}|" "$courseFile"; then
-				die "predmet jiz existuje" 1
+			printf "%-8s | %-8s | %-8s | %-2s | %2s | %s\n" "$facultyCol" "$semesterCol" "$codeCol" "$typeCol" "$creditsCol" "$nameCol"
+
+		done < <(sort -t "|" -k1,1 -k2,2 -k3,3 "$courseFile")
+
+		if [[ "$found" != true ]]; then
+			die "nic se nenaslo" 1
+		fi
+
+		exit 0
+		;;
+
+	"předmět-smaž" | "predmet-smaz")
+
+		validateArgs "$#" 3 3
+
+		if [[ ! -f "$courseFile" ]]; then
+			die "predmety nene" 1
+		fi
+
+		local faculty="${args[1]}"
+		local semester="${args[2]}"
+		local code="${args[3]}"
+
+		if ! grep -qi "^${faculty}|${semester}|${code}" "$courseFile"; then
+			die "predmet neexistuje" 1
+		fi
+
+		local tempFile="${dataDir}/tmp"
+		touch "$tempFile"
+		
+		while IFS="|" read -r facultyCol semesterCol codeCol nameCol typeCol creditsCol; do
+			if [[ "$faculty" != "$facultyCol" ]] || [[ "$semester" != "$semesterCol" ]] || [[ "${code,,}" != "${codeCol,,}" ]]; then
+				echo "${facultyCol}|${semesterCol}|${codeCol}|${nameCol}|${typeCol}|${creditsCol}" >> "$tempFile"
 			fi
+		done < "$courseFile"
 
-			if ! [[ "${type}" =~ ^(zk|k|z)$ ]]; then
-				die "neplatne zakonceni" 1
+		mv "$tempFile" "$courseFile"
+
+		exit 0
+		;;
+
+	"předmět-ukončení" | "predmet-ukonceni")
+
+		validateArgs "$#" 4 4
+
+		if [[ ! -f "$courseFile" ]]; then
+			die "predmety nene" 1
+		fi
+
+		local faculty="${args[1]}"
+		local semester="${args[2]}"
+		local code="${args[3]}"
+		local newType="${args[4]}"
+
+		if ! [[ "${newType}" =~ ^(zk|k|z)$ ]]; then
+			die "neplatne zakonceni" 1
+		fi
+
+		if ! grep -qi "^${faculty}|${semester}|${code}" "$courseFile"; then
+			die "predmet neexistuje" 1
+		fi
+
+		local tempFile="${dataDir}/tmp"
+		touch "$tempFile"
+		
+		while IFS="|" read -r facultyCol semesterCol codeCol nameCol typeCol creditsCol; do
+			if [[ "$faculty" == "$facultyCol" ]] && [[ "$semester" == "$semesterCol" ]] && [[ "${code,,}" == "${codeCol,,}" ]]; then
+				echo "${facultyCol}|${semesterCol}|${codeCol}|${nameCol}|${newType}|${creditsCol}" >> "$tempFile"
+			else
+				echo "${facultyCol}|${semesterCol}|${codeCol}|${nameCol}|${typeCol}|${creditsCol}" >> "$tempFile"
 			fi
+		done < "$courseFile"
 
-			if ! [[ "${credits}" =~ ^[0-9]+$ ]] || (( credits < 0 || credits > 20 )); then
-				die "neplatne kredity" 1
+		mv "$tempFile" "$courseFile"
+
+		exit 0
+		;;
+
+	"předmět-nový" | "predmet-novy")
+
+		validateArgs "$#" 6 6
+
+		if [[ ! -f "$courseFile" ]] && ! touch "$courseFile"; then
+			die "nepodarilo se vytvorit soubor '${courseFile}'" 1
+		fi
+
+		local faculty="${args[1]}"
+		local semester="${args[2]}"
+		local code="${args[3]}"
+		local name="${args[4]}"
+		local type="${args[5]}"
+		local credits="${args[6]}"
+		
+		if [[ ! -f "$facultiesFile" ]] || ! grep -q "^${faculty}" "$facultiesFile"; then
+			die "fakulta neexistuje" 1
+		fi
+		
+		if [[ ! -f "$semestersFile" ]] || ! grep -q "^${faculty}|${id}" "$facultiesFile"; then
+			die "fakulta neexistuje" 1
+		fi
+		
+		if ! [[ "${code}" =~ ^[A-Za-z][A-Za-z0-9_]{0,7}$ ]]; then
+			die "kod predmetu ve spatnem tvaru" 1
+		fi
+
+		if grep -qi "^[^|]*|[^|]*|${code}|" "$courseFile"; then
+			die "predmet jiz existuje" 1
+		fi
+
+		if ! [[ "${type}" =~ ^(zk|k|z)$ ]]; then
+			die "neplatne zakonceni" 1
+		fi
+
+		if ! [[ "${credits}" =~ ^[0-9]+$ ]] || (( credits < 0 || credits > 20 )); then
+			die "neplatne kredity" 1
+		fi
+
+		echo "${faculty}|${semester}|${code}|${name}|${type}|${credits}" >> "$courseFile"
+
+		exit 0
+		;;
+
+	"předmět-kredity" | "predmet-kredity")
+
+		validateArgs "$#" 4 4
+
+		if [[ ! -f "$courseFile" ]]; then
+			die "predmety nene" 1
+		fi
+
+		local faculty="${args[1]}"
+		local semester="${args[2]}"
+		local code="${args[3]}"
+		local newCredits="${args[4]}"
+
+		if ! [[ "${newCredits}" =~ ^[0-9]+$ ]] || (( newCredits < 0 || newCredits > 20 )); then
+			die "neplatne kredity" 1
+		fi
+
+		if ! grep -qi "^${faculty}|${semester}|${code}" "$courseFile"; then
+			die "predmet neexistuje" 1
+		fi
+
+		local tempFile="${dataDir}/tmp"
+		touch "$tempFile"
+		
+		while IFS="|" read -r facultyCol semesterCol codeCol nameCol typeCol creditsCol; do
+			if [[ "$faculty" == "$facultyCol" ]] && [[ "$semester" == "$semesterCol" ]] && [[ "${code,,}" == "${codeCol,,}" ]]; then
+				echo "${facultyCol}|${semesterCol}|${codeCol}|${nameCol}|${typeCol}|${newCredits}" >> "$tempFile"
+			else
+				echo "${facultyCol}|${semesterCol}|${codeCol}|${nameCol}|${typeCol}|${creditsCol}" >> "$tempFile"
 			fi
+		done < "$courseFile"
 
-			echo "${faculty}|${semester}|${code}|${name}|${type}|${credits}" >> "$courseFile"
+		mv "$tempFile" "$courseFile"
 
-			exit 0
-			;;
+		exit 0
+		;;
 
-		"předmět-kredity" | "predmet-kredity")
+	"předmět-název" | "predmet-nazev")
 
-			validateArgs "$#" 4 4
+		validateArgs "$#" 4 4
 
-			if [[ ! -f "$courseFile" ]]; then
-				die "predmety nene" 1
+		if [[ ! -f "$courseFile" ]]; then
+			die "predmety nene" 1
+		fi
+
+		local faculty="${args[1]}"
+		local semester="${args[2]}"
+		local code="${args[3]}"
+		local newName="${args[4]}"
+
+		if ! grep -qi "^${faculty}|${semester}|${code}" "$courseFile"; then
+			die "predmet neexistuje" 1
+		fi
+
+		local tempFile="${dataDir}/tmp"
+		touch "$tempFile"
+		
+		while IFS="|" read -r facultyCol semesterCol codeCol nameCol typeCol creditsCol; do
+			if [[ "$faculty" == "$facultyCol" ]] && [[ "$semester" == "$semesterCol" ]] && [[ "${code,,}" == "${codeCol,,}" ]]; then
+				echo "${facultyCol}|${semesterCol}|${codeCol}|${newName}|${typeCol}|${creditsCol}" >> "$tempFile"
+			else
+				echo "${facultyCol}|${semesterCol}|${codeCol}|${nameCol}|${typeCol}|${creditsCol}" >> "$tempFile"
 			fi
+		done < "$courseFile"
 
-			local faculty="${args[1]}"
-			local semester="${args[2]}"
-			local code="${args[3]}"
-			local newCredits="${args[4]}"
+		mv "$tempFile" "$courseFile"
 
-			if ! [[ "${newCredits}" =~ ^[0-9]+$ ]] || (( newCredits < 0 || newCredits > 20 )); then
-				die "neplatne kredity" 1
-			fi
-
-			if ! grep -qi "^${faculty}|${semester}|${code}" "$courseFile"; then
-				die "predmet neexistuje" 1
-			fi
-
-			local tempFile="${dataDir}/tmp"
-			touch "$tempFile"
-			
-			while IFS="|" read -r facultyCol semesterCol codeCol nameCol typeCol creditsCol; do
-				if [[ "$faculty" == "$facultyCol" ]] && [[ "$semester" == "$semesterCol" ]] && [[ "${code,,}" == "${codeCol,,}" ]]; then
-					echo "${facultyCol}|${semesterCol}|${codeCol}|${nameCol}|${typeCol}|${newCredits}" >> "$tempFile"
-				else
-					echo "${facultyCol}|${semesterCol}|${codeCol}|${nameCol}|${typeCol}|${creditsCol}" >> "$tempFile"
-				fi
-			done < "$courseFile"
-
-			mv "$tempFile" "$courseFile"
-
-			exit 0
-			;;
-
-		"předmět-název" | "predmet-nazev")
-
-			validateArgs "$#" 4 4
-
-			if [[ ! -f "$courseFile" ]]; then
-				die "predmety nene" 1
-			fi
-
-			local faculty="${args[1]}"
-			local semester="${args[2]}"
-			local code="${args[3]}"
-			local newName="${args[4]}"
-
-			# echo "$newName"
-
-			if ! grep -qi "^${faculty}|${semester}|${code}" "$courseFile"; then
-				die "predmet neexistuje" 1
-			fi
-
-			local tempFile="${dataDir}/tmp"
-			touch "$tempFile"
-			
-			while IFS="|" read -r facultyCol semesterCol codeCol nameCol typeCol creditsCol; do
-				if [[ "$faculty" == "$facultyCol" ]] && [[ "$semester" == "$semesterCol" ]] && [[ "${code,,}" == "${codeCol,,}" ]]; then
-					echo "${facultyCol}|${semesterCol}|${codeCol}|${newName}|${typeCol}|${creditsCol}" >> "$tempFile"
-				else
-					echo "${facultyCol}|${semesterCol}|${codeCol}|${nameCol}|${typeCol}|${creditsCol}" >> "$tempFile"
-				fi
-			done < "$courseFile"
-
-			mv "$tempFile" "$courseFile"
-
-			exit 0
-			;;
+		exit 0
+		;;
 
         *)
-            die "neznamy prikaz" 1
-            ;;
-    esac
+		die "neznamy prikaz" 1
+		;;
+	esac
 
 	exit 0
 }
